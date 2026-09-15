@@ -1,0 +1,178 @@
+{
+ "actions": [],
+ "autoname": "VSS-.YYYY.-.#####",
+ "creation": "2026-08-03 14:14:10.250850",
+ "doctype": "DocType",
+ "document_type": "Document",
+ "engine": "InnoDB",
+ "field_order": [
+  "vendor",
+  "period",
+  "column_break_survey",
+  "survey_date",
+  "status",
+  "is_system_generated",
+  "section_break_ratings",
+  "ratings",
+  "section_break_feedback",
+  "issues",
+  "column_break_feedback",
+  "remarks",
+  "amended_from",
+  "last_reminder_sent"
+ ],
+ "fields": [
+  {
+   "fieldname": "vendor",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Vendor",
+   "options": "Supplier",
+   "read_only_depends_on": "eval:doc.is_system_generated",
+   "reqd": 1
+  },
+  {
+   "fieldname": "period",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Period",
+   "options": "\nMonthly\nQuarterly\nHalf-Yearly\nYearly",
+   "read_only_depends_on": "eval:doc.is_system_generated",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_survey",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Today",
+   "fieldname": "survey_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Survey Date",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "default": "Open",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Open\nIn Progress\nRatings Given\nCompleted\nCancelled",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "is_system_generated",
+   "fieldtype": "Check",
+   "hidden": 1,
+   "label": "Is System Generated",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_ratings",
+   "fieldtype": "Section Break",
+   "label": "Ratings"
+  },
+  {
+   "fieldname": "ratings",
+   "fieldtype": "Table",
+   "label": "Ratings",
+   "options": "Vendor Satisfaction Rating"
+  },
+  {
+   "fieldname": "section_break_feedback",
+   "fieldtype": "Section Break",
+   "label": "Feedback"
+  },
+  {
+   "fieldname": "issues",
+   "fieldtype": "Small Text",
+   "label": "Areas of Concern"
+  },
+  {
+   "fieldname": "column_break_feedback",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Suggestions for Improvement"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Vendor Satisfaction Survey",
+   "print_hide": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_reminder_sent",
+   "fieldtype": "Date",
+   "hidden": 1,
+   "label": "Last Reminder Sent",
+   "no_copy": 1,
+   "read_only": 1
+  }
+ ],
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-09-04 03:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Vendor Lifecycle",
+ "name": "Vendor Satisfaction Survey",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Vendor Lifecycle Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Vendor Lifecycle User"
+  },
+  {
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "Supplier",
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

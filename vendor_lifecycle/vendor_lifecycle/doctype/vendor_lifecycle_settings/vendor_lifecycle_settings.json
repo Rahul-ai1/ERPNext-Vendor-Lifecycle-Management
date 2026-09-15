@@ -1,0 +1,392 @@
+{
+ "actions": [],
+ "creation": "2026-08-03 12:34:31.754912",
+ "doctype": "DocType",
+ "document_type": "Other",
+ "engine": "InnoDB",
+ "field_order": [
+  "onboarding_tab",
+  "onboarding_request_section",
+  "duplicate_request_handling",
+  "duplicate_kyc_handling",
+  "restrict_supplier_creation_to_vendor_lifecycle",
+  "column_break_vendor_kyc",
+  "require_onboarding_request_for_kyc",
+  "require_complete_bank_details",
+  "require_complete_address_details",
+  "stages_section",
+  "background_check_mandatory",
+  "reference_result_method",
+  "background_check_result_method",
+  "audit_mandatory",
+  "compliance_audit_validity_months",
+  "column_break_reference_minimum_rating",
+  "reference_minimum_average_rating",
+  "sampling_mandatory_overrides",
+  "deboarding_engagement_tab",
+  "deboarding_section",
+  "default_deboarding_rating_template",
+  "default_checklist_template",
+  "engagement_section",
+  "enable_satisfaction_surveys",
+  "survey_cadence",
+  "default_rating_template",
+  "notifications_tab",
+  "enable_vendor_lifecycle_emails",
+  "column_break_email_account",
+  "vendor_lifecycle_email_account",
+  "vendor_lifecycle_email_always_cc",
+  "per_doctype_emails_section",
+  "onboarding_request_emails",
+  "onboarding_verification_emails",
+  "deboarding_request_emails",
+  "satisfaction_survey_emails",
+  "satisfaction_survey_reminder_emails",
+  "column_break_per_doctype_emails",
+  "deboarding_checklist_emails",
+  "deboarding_checklist_task_reminder_emails",
+  "deboarding_checklist_clearance_followup_emails",
+  "support_ticket_emails",
+  "support_ticket_escalation_emails"
+ ],
+ "fields": [
+  {
+   "fieldname": "onboarding_tab",
+   "fieldtype": "Tab Break",
+   "label": "Onboarding"
+  },
+  {
+   "fieldname": "onboarding_request_section",
+   "fieldtype": "Section Break",
+   "label": "Onboarding Request & KYC"
+  },
+  {
+   "default": "Warn",
+   "description": "How to handle a duplicate email/contact number on a new Onboarding Request.",
+   "fieldname": "duplicate_request_handling",
+   "fieldtype": "Select",
+   "label": "On Duplicate Onboarding Request",
+   "options": "No Check\nWarn\nBlock",
+   "reqd": 1
+  },
+  {
+   "default": "1",
+   "description": "Only allow KYC to be started from an Onboarding Request.",
+   "fieldname": "require_onboarding_request_for_kyc",
+   "fieldtype": "Check",
+   "label": "Require Onboarding Request for KYC"
+  },
+  {
+   "default": "Stop",
+   "description": "How to handle a KYC reusing an Onboarding Request that already has one.",
+   "fieldname": "duplicate_kyc_handling",
+   "fieldtype": "Select",
+   "label": "On Duplicate KYC for Same Request",
+   "options": "Stop\nWarn\nIgnore",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "description": "Block new Suppliers unless linked to a Vendor KYC.",
+   "fieldname": "restrict_supplier_creation_to_vendor_lifecycle",
+   "fieldtype": "Check",
+   "label": "Restrict Supplier Creation to Vendor Lifecycle"
+  },
+  {
+   "fieldname": "column_break_vendor_kyc",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "description": "Require all four bank fields together, or none.",
+   "fieldname": "require_complete_bank_details",
+   "fieldtype": "Check",
+   "label": "Require Complete Bank Details"
+  },
+  {
+   "default": "1",
+   "description": "Require all five address fields together, or none.",
+   "fieldname": "require_complete_address_details",
+   "fieldtype": "Check",
+   "label": "Require Complete Address Details"
+  },
+  {
+   "fieldname": "stages_section",
+   "fieldtype": "Section Break",
+   "label": "Onboarding Stages"
+  },
+  {
+   "default": "1",
+   "description": "If unchecked, the Background Check stage can be skipped.",
+   "fieldname": "background_check_mandatory",
+   "fieldtype": "Check",
+   "label": "Background Check Mandatory"
+  },
+  {
+   "default": "Average",
+   "description": "Default rule for combining a Reference's ratings into a pass/fail result.",
+   "fieldname": "reference_result_method",
+   "fieldtype": "Select",
+   "label": "Reference Result Method",
+   "options": "Average\nEach Criteria Must Pass\nMajority of Criteria",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_reference_minimum_rating",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "3",
+   "description": "Fallback pass/fail rating threshold (1–5).",
+   "fieldname": "reference_minimum_average_rating",
+   "fieldtype": "Float",
+   "label": "Minimum Average Rating (Reference)",
+   "non_negative": 1,
+   "precision": "1"
+  },
+  {
+   "default": "Each Reference Must Pass",
+   "description": "Rule for combining all references into one Background Check result.",
+   "fieldname": "background_check_result_method",
+   "fieldtype": "Select",
+   "label": "Background Check Result Method",
+   "options": "Each Reference Must Pass\nMajority of References",
+   "reqd": 1
+  },
+  {
+   "default": "1",
+   "description": "If unchecked, Compliance Audit can be skipped.",
+   "fieldname": "audit_mandatory",
+   "fieldtype": "Check",
+   "label": "Compliance Audit Mandatory"
+  },
+  {
+   "default": "12",
+   "description": "How many months a Passed audit stays valid.",
+   "fieldname": "compliance_audit_validity_months",
+   "fieldtype": "Int",
+   "label": "Compliance Audit Validity Period (Months)",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "description": "Business Types that require Sampling Evaluation.",
+   "fieldname": "sampling_mandatory_overrides",
+   "fieldtype": "Table",
+   "label": "Sampling Mandatory Overrides (by Business Type)",
+   "options": "Sampling Mandatory Override"
+  },
+  {
+   "fieldname": "deboarding_engagement_tab",
+   "fieldtype": "Tab Break",
+   "label": "Deboarding & Ongoing Engagement"
+  },
+  {
+   "fieldname": "deboarding_section",
+   "fieldtype": "Section Break",
+   "label": "Deboarding"
+  },
+  {
+   "description": "Which Rating Criteria show on a Vendor Deboarding Request.",
+   "fieldname": "default_deboarding_rating_template",
+   "fieldtype": "Link",
+   "label": "Default Deboarding Rating Template",
+   "link_filters": "[[\"Deboarding Rating Template\",\"disabled\",\"=\",0]]",
+   "options": "Deboarding Rating Template",
+   "reqd": 1
+  },
+  {
+   "description": "Which checklist a new Vendor Deboarding Checklist loads by default.",
+   "fieldname": "default_checklist_template",
+   "fieldtype": "Link",
+   "label": "Default Checklist Template",
+   "link_filters": "[[\"Vendor Deboarding Checklist Template\",\"disabled\",\"=\",0]]",
+   "options": "Vendor Deboarding Checklist Template",
+   "reqd": 1
+  },
+  {
+   "fieldname": "engagement_section",
+   "fieldtype": "Section Break",
+   "label": "Ongoing Engagement"
+  },
+  {
+   "default": "1",
+   "description": "If unchecked, no new surveys are auto-created.",
+   "fieldname": "enable_satisfaction_surveys",
+   "fieldtype": "Check",
+   "label": "Auto-Create Satisfaction Surveys"
+  },
+  {
+   "default": "Quarterly",
+   "depends_on": "eval:doc.enable_satisfaction_surveys",
+   "description": "How often a new survey is created per vendor.",
+   "fieldname": "survey_cadence",
+   "fieldtype": "Select",
+   "label": "Survey Cadence",
+   "options": "Monthly\nQuarterly\nHalf-Yearly\nYearly",
+   "reqd": 1
+  },
+  {
+   "description": "Fallback Rating Criteria for surveys, if the Supplier has none.",
+   "fieldname": "default_rating_template",
+   "fieldtype": "Link",
+   "label": "Default Rating Template",
+   "link_filters": "[[\"Satisfaction Rating Template\",\"disabled\",\"=\",0]]",
+   "options": "Satisfaction Rating Template",
+   "reqd": 1
+  },
+  {
+   "fieldname": "notifications_tab",
+   "fieldtype": "Tab Break",
+   "label": "Notifications"
+  },
+  {
+   "default": "0",
+   "description": "Master switch for all automated emails.",
+   "fieldname": "enable_vendor_lifecycle_emails",
+   "fieldtype": "Check",
+   "label": "Use Emails"
+  },
+  {
+   "depends_on": "eval:doc.enable_vendor_lifecycle_emails",
+   "fieldname": "column_break_email_account",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.enable_vendor_lifecycle_emails",
+   "description": "Email account used to send all Vendor Lifecycle emails.",
+   "fieldname": "vendor_lifecycle_email_account",
+   "fieldtype": "Link",
+   "label": "Email Account",
+   "link_filters": "[[\"Email Account\",\"enable_outgoing\",\"=\",1]]",
+   "mandatory_depends_on": "eval:doc.enable_vendor_lifecycle_emails",
+   "options": "Email Account"
+  },
+  {
+   "depends_on": "eval:doc.enable_vendor_lifecycle_emails",
+   "description": "Addresses always CC'd on every email (comma-separated).",
+   "fieldname": "vendor_lifecycle_email_always_cc",
+   "fieldtype": "Small Text",
+   "label": "Always CC"
+  },
+  {
+   "depends_on": "eval:doc.enable_vendor_lifecycle_emails",
+   "fieldname": "per_doctype_emails_section",
+   "fieldtype": "Section Break"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.enable_vendor_lifecycle_emails",
+   "description": "Independent on/off switch for this doctype's own emails, on top of the master switch above.",
+   "fieldname": "onboarding_request_emails",
+   "fieldtype": "Check",
+   "label": "Vendor Onboarding Request Emails"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.enable_vendor_lifecycle_emails",
+   "description": "Covers Vendor KYC, Vendor Background Check, Vendor Compliance Audit, Vendor Sampling Evaluation, and Vendor Sign Off.",
+   "fieldname": "onboarding_verification_emails",
+   "fieldtype": "Check",
+   "label": "Onboarding & Verification Emails"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.enable_vendor_lifecycle_emails",
+   "fieldname": "deboarding_request_emails",
+   "fieldtype": "Check",
+   "label": "Vendor Deboarding Request Emails"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.enable_vendor_lifecycle_emails",
+   "fieldname": "satisfaction_survey_emails",
+   "fieldtype": "Check",
+   "label": "Vendor Satisfaction Survey Emails"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.enable_vendor_lifecycle_emails && doc.satisfaction_survey_emails",
+   "description": "Scheduled nag for a survey that's still not filled in.",
+   "fieldname": "satisfaction_survey_reminder_emails",
+   "fieldtype": "Check",
+   "label": "Satisfaction Survey Reminder"
+  },
+  {
+   "fieldname": "column_break_per_doctype_emails",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.enable_vendor_lifecycle_emails",
+   "fieldname": "deboarding_checklist_emails",
+   "fieldtype": "Check",
+   "label": "Vendor Deboarding Checklist Emails"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.enable_vendor_lifecycle_emails && doc.deboarding_checklist_emails",
+   "description": "Scheduled nag to whoever's assigned a still-open checklist task.",
+   "fieldname": "deboarding_checklist_task_reminder_emails",
+   "fieldtype": "Check",
+   "label": "Checklist Task Reminder"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.enable_vendor_lifecycle_emails && doc.deboarding_checklist_emails",
+   "description": "Scheduled nag chasing an outstanding signed Clearance Certificate.",
+   "fieldname": "deboarding_checklist_clearance_followup_emails",
+   "fieldtype": "Check",
+   "label": "Clearance Certificate Follow-up"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.enable_vendor_lifecycle_emails",
+   "fieldname": "support_ticket_emails",
+   "fieldtype": "Check",
+   "label": "Vendor Support Ticket Emails"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.enable_vendor_lifecycle_emails && doc.support_ticket_emails",
+   "description": "Scheduled nag for a still-open ticket that's gone stale.",
+   "fieldname": "support_ticket_escalation_emails",
+   "fieldtype": "Check",
+   "label": "Support Ticket Escalation"
+  }
+ ],
+ "grid_page_length": 50,
+ "icon": "fa fa-cog",
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-09-05 21:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Vendor Lifecycle",
+ "name": "Vendor Lifecycle Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "Vendor Lifecycle Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

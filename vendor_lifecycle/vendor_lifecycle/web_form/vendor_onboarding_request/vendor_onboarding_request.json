@@ -1,0 +1,375 @@
+{
+ "allow_comments": 0,
+ "allow_delete": 0,
+ "allow_edit": 0,
+ "allow_incomplete": 0,
+ "allow_multiple": 1,
+ "allow_print": 0,
+ "apply_document_permissions": 0,
+ "breadcrumbs": "",
+ "button_label": "Submit",
+ "client_script": "frappe.web_form.on(\"establishment_date\", (field, value) => {\n\tif (!value) return;\n\tconst days = frappe.datetime.get_day_diff(frappe.datetime.now_date(), value);\n\tif (days < 0) {\n\t\tfrappe.msgprint(__(\"Establishment Date cannot be in the future.\"));\n\t\tfrappe.web_form.set_value(\"establishment_date\", \"\");\n\t\treturn;\n\t}\n\tconst years = days / 365.25;\n\tfrappe.web_form.set_value(\"years_in_business\", Math.max(0, Math.round(years * 100) / 100));\n});\n\n// Web Forms turn every Link field into a static Autocomplete at render\n// time, pre-loaded with EVERY record of the target doctype (frappe's own\n// process_link_field()/get_link_options() \u2014 there's no live, server-side,\n// country-scoped query on a web form, unlike the desk forms). So filtering\n// by Country happens client-side instead, against the already-loaded full\n// list, via the Autocomplete control's own set_data().\nfrappe.web_form.on(\"country\", (field, value) => {\n\tfrappe.web_form.set_value(\"state_master\", \"\");\n\tconst state_field = frappe.web_form.get_field(\"state_master\");\n\tif (!state_field) return;\n\n\tif (!frappe.web_form._all_states) {\n\t\tfrappe.web_form._all_states = (state_field.df.options || \"\").split(\"\\n\").filter(Boolean);\n\t}\n\tconst filtered = value ? frappe.web_form._all_states.filter((s) => s.endsWith(`(${value})`)) : [];\n\tstate_field.set_data(filtered);\n\n\tif (value && !filtered.length) {\n\t\tfrappe.msgprint({\n\t\t\ttitle: __(\"No States Listed Yet\"),\n\t\t\tindicator: \"orange\",\n\t\t\tmessage: __(\"No states are listed yet for {0}.\", [frappe.bold(value)]),\n\t\t});\n\t}\n});\n\nfrappe.web_form.on(\"state_master\", (field, value) => {\n\tif (!value) return;\n\tfrappe.db.get_value(\"State\", value, \"state_name\").then((r) => {\n\t\tif (r.message && r.message.state_name) {\n\t\t\tfrappe.web_form.set_value(\"state\", r.message.state_name);\n\t\t}\n\t});\n});\n",
+ "creation": "2026-08-03 12:40:30.491883",
+ "doc_type": "Vendor Onboarding Request",
+ "docstatus": 0,
+ "doctype": "Web Form",
+ "introduction_text": "Tell us about your business. Our team will review your submission and follow up on next steps.",
+ "is_standard": 1,
+ "login_required": 0,
+ "max_attachment_size": 0,
+ "modified": "2026-08-03 12:40:30.491883",
+ "modified_by": "Administrator",
+ "module": "Vendor Lifecycle",
+ "name": "vendor-onboarding-request",
+ "owner": "Administrator",
+ "published": 1,
+ "route": "vendor-onboarding-request",
+ "route_to_success_link": 0,
+ "show_attachments": 0,
+ "show_list": 0,
+ "show_sidebar": 1,
+ "success_message": "Thank you. Your onboarding request has been submitted and will be reviewed by our team.",
+ "title": "Vendor Onboarding Request",
+ "web_form_fields": [
+  {
+   "fieldname": "section_break_company",
+   "fieldtype": "Section Break",
+   "label": "Company Details"
+  },
+  {
+   "fieldname": "company_name",
+   "fieldtype": "Data",
+   "label": "Company / Firm Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "business_type",
+   "fieldtype": "Select",
+   "label": "Business Type",
+   "options": "\nManufacturer\nTrader\nService Provider\nContractor / Job Worker\nLogistics / Transporter\nFreelancer / Consultant\nRaw Material Supplier\nEquipment / Machinery Supplier\nTechnology / Software Vendor\nFacility / Maintenance Services\nOther",
+   "reqd": 1
+  },
+  {
+   "depends_on": "eval:doc.business_type=='Other'",
+   "fieldname": "other_business_type",
+   "fieldtype": "Data",
+   "label": "Please Specify Business Type",
+   "reqd": 0
+  },
+  {
+   "fieldname": "section_break_contact",
+   "fieldtype": "Section Break",
+   "label": "Contact & Address"
+  },
+  {
+   "fieldname": "contact_person",
+   "fieldtype": "Data",
+   "label": "Contact Person",
+   "reqd": 1
+  },
+  {
+   "fieldname": "contact_number",
+   "fieldtype": "Phone",
+   "label": "Contact Number",
+   "reqd": 1
+  },
+  {
+   "fieldname": "email",
+   "fieldtype": "Data",
+   "label": "Email",
+   "options": "Email",
+   "reqd": 1
+  },
+  {
+   "fieldname": "website",
+   "fieldtype": "Data",
+   "label": "Website"
+  },
+  {
+   "fieldname": "column_break_contact",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "city",
+   "fieldtype": "Data",
+   "label": "City",
+   "reqd": 1
+  },
+  {
+   "depends_on": "eval:doc.country",
+   "fieldname": "state_master",
+   "fieldtype": "Link",
+   "label": "State",
+   "options": "State"
+  },
+  {
+   "fieldname": "state",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "State"
+  },
+  {
+   "fieldname": "address_line_1",
+   "fieldtype": "Data",
+   "label": "Address Line 1"
+  },
+  {
+   "fieldname": "address_line_2",
+   "fieldtype": "Data",
+   "label": "Address Line 2"
+  },
+  {
+   "fieldname": "column_break_contact_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "country",
+   "fieldtype": "Link",
+   "label": "Country",
+   "options": "Country",
+   "reqd": 1
+  },
+  {
+   "fieldname": "pincode",
+   "fieldtype": "Data",
+   "label": "Postal / ZIP Code",
+   "reqd": 1
+  },
+  {
+   "fieldname": "tax_id",
+   "fieldtype": "Data",
+   "label": "Tax ID (PAN / VAT / EIN, etc.)"
+  },
+  {
+   "depends_on": "eval:doc.country=='India'",
+   "description": "India-specific — shown only when Country is India.",
+   "fieldname": "gstin_uin",
+   "fieldtype": "Data",
+   "label": "GSTIN / UIN"
+  },
+  {
+   "fieldname": "section_break_business",
+   "fieldtype": "Section Break",
+   "label": "About Your Business"
+  },
+  {
+   "depends_on": "eval:!doc.business_type",
+   "fieldname": "business_details_hint",
+   "fieldtype": "HTML",
+   "options": "<p class=\"text-muted\">Kindly select Business Type above to fill Business Details.</p>"
+  },
+  {
+   "fieldname": "estimated_monthly_production_capacity",
+   "fieldtype": "Int",
+   "label": "Estimated Monthly Production Capacity",
+   "depends_on": "eval:doc.business_type && ![\"Trader\", \"Service Provider\", \"Logistics / Transporter\", \"Raw Material Supplier\", \"Equipment / Machinery Supplier\", \"Technology / Software Vendor\", \"Facility / Maintenance Services\", \"Freelancer / Consultant\"].includes(doc.business_type)",
+   "mandatory_depends_on": "eval:[\"Manufacturer\", \"Contractor / Job Worker\"].includes(doc.business_type)"
+  },
+  {
+   "fieldname": "specialization",
+   "fieldtype": "Data",
+   "label": "Specialization",
+   "depends_on": "eval:doc.business_type",
+   "mandatory_depends_on": "eval:doc.business_type"
+  },
+  {
+   "description": "Used to auto-calculate Years in Business below.",
+   "fieldname": "establishment_date",
+   "fieldtype": "Date",
+   "label": "Establishment Date",
+   "depends_on": "eval:doc.business_type"
+  },
+  {
+   "depends_on": "eval:doc.business_type=='Trader'",
+   "fieldname": "brands_distributed",
+   "fieldtype": "Small Text",
+   "label": "Brands / Sources You Distribute",
+   "mandatory_depends_on": "eval:doc.business_type=='Trader'"
+  },
+  {
+   "depends_on": "eval:doc.business_type=='Service Provider'",
+   "fieldname": "service_types_offered",
+   "fieldtype": "Small Text",
+   "label": "Types of Services Offered",
+   "mandatory_depends_on": "eval:doc.business_type=='Service Provider'"
+  },
+  {
+   "depends_on": "eval:doc.business_type=='Contractor / Job Worker'",
+   "fieldname": "scope_of_work",
+   "fieldtype": "Small Text",
+   "label": "Scope of Work",
+   "mandatory_depends_on": "eval:doc.business_type=='Contractor / Job Worker'"
+  },
+  {
+   "depends_on": "eval:doc.business_type=='Logistics / Transporter'",
+   "fieldname": "fleet_size",
+   "fieldtype": "Int",
+   "label": "Fleet Size",
+   "mandatory_depends_on": "eval:doc.business_type=='Logistics / Transporter'"
+  },
+  {
+   "depends_on": "eval:doc.business_type=='Freelancer / Consultant'",
+   "fieldname": "areas_of_expertise",
+   "fieldtype": "Small Text",
+   "label": "Areas of Expertise",
+   "mandatory_depends_on": "eval:doc.business_type=='Freelancer / Consultant'"
+  },
+  {
+   "depends_on": "eval:doc.business_type=='Raw Material Supplier'",
+   "fieldname": "materials_supplied",
+   "fieldtype": "Small Text",
+   "label": "Materials Supplied",
+   "mandatory_depends_on": "eval:doc.business_type=='Raw Material Supplier'"
+  },
+  {
+   "depends_on": "eval:doc.business_type=='Equipment / Machinery Supplier'",
+   "fieldname": "equipment_types",
+   "fieldtype": "Small Text",
+   "label": "Equipment / Machinery Types",
+   "mandatory_depends_on": "eval:doc.business_type=='Equipment / Machinery Supplier'"
+  },
+  {
+   "depends_on": "eval:doc.business_type=='Technology / Software Vendor'",
+   "fieldname": "product_or_platform_name",
+   "fieldtype": "Data",
+   "label": "Product / Platform Name",
+   "mandatory_depends_on": "eval:doc.business_type=='Technology / Software Vendor'"
+  },
+  {
+   "depends_on": "eval:doc.business_type=='Facility / Maintenance Services'",
+   "fieldname": "services_covered",
+   "fieldtype": "Small Text",
+   "label": "Services Covered",
+   "mandatory_depends_on": "eval:doc.business_type=='Facility / Maintenance Services'"
+  },
+  {
+   "fieldname": "column_break_business",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "years_in_business",
+   "fieldtype": "Float",
+   "label": "Years in Business",
+   "depends_on": "eval:doc.establishment_date",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "fieldname": "team_size",
+   "fieldtype": "Select",
+   "label": "Team Size",
+   "options": "\n0-50\n51-100\n101-150\n150+",
+   "depends_on": "eval:doc.business_type",
+   "mandatory_depends_on": "eval:doc.business_type"
+  },
+  {
+   "fieldname": "referral_source",
+   "fieldtype": "Select",
+   "label": "How Did You Hear About Us?",
+   "options": "\nGoogle Search\nSocial Media\nReferral from Existing Vendor\nTrade Show / Event\nAdvertisement\nOther",
+   "depends_on": "eval:doc.business_type"
+  },
+  {
+   "depends_on": "eval:doc.referral_source=='Other'",
+   "fieldname": "referral_source_other",
+   "fieldtype": "Data",
+   "label": "Please Specify",
+   "mandatory_depends_on": "eval:doc.referral_source=='Other'"
+  },
+  {
+   "depends_on": "eval:doc.referral_source=='Referral from Existing Vendor'",
+   "fieldname": "existing_vendor_name",
+   "fieldtype": "Data",
+   "label": "Name of Referring Vendor",
+   "mandatory_depends_on": "eval:doc.referral_source=='Referral from Existing Vendor'"
+  },
+  {
+   "depends_on": "eval:doc.business_type=='Trader'",
+   "fieldname": "minimum_order_quantity",
+   "fieldtype": "Data",
+   "label": "Minimum Order Quantity",
+   "mandatory_depends_on": "eval:doc.business_type=='Trader'"
+  },
+  {
+   "depends_on": "eval:doc.business_type=='Service Provider'",
+   "fieldname": "turnaround_time",
+   "fieldtype": "Data",
+   "label": "Typical Turnaround Time",
+   "mandatory_depends_on": "eval:doc.business_type=='Service Provider'"
+  },
+  {
+   "depends_on": "eval:doc.business_type=='Contractor / Job Worker'",
+   "fieldname": "equipment_provided_by",
+   "fieldtype": "Select",
+   "label": "Equipment Provided By",
+   "options": "\nVendor\nUs\nBoth",
+   "mandatory_depends_on": "eval:doc.business_type=='Contractor / Job Worker'"
+  },
+  {
+   "depends_on": "eval:doc.business_type=='Logistics / Transporter' || doc.business_type=='Facility / Maintenance Services'",
+   "fieldname": "coverage_area",
+   "fieldtype": "Small Text",
+   "label": "Coverage Area / Regions Served",
+   "mandatory_depends_on": "eval:doc.business_type=='Logistics / Transporter' || doc.business_type=='Facility / Maintenance Services'"
+  },
+  {
+   "depends_on": "eval:doc.business_type=='Freelancer / Consultant'",
+   "fieldname": "availability_hours_per_week",
+   "fieldtype": "Int",
+   "label": "Availability (Hours/Week)",
+   "mandatory_depends_on": "eval:doc.business_type=='Freelancer / Consultant'"
+  },
+  {
+   "depends_on": "eval:doc.business_type=='Raw Material Supplier'",
+   "fieldname": "certification_standards",
+   "fieldtype": "Data",
+   "label": "Certifications / Standards (ISO, etc.)",
+   "mandatory_depends_on": "eval:doc.business_type=='Raw Material Supplier'"
+  },
+  {
+   "depends_on": "eval:doc.business_type=='Equipment / Machinery Supplier'",
+   "fieldname": "warranty_support_offered",
+   "fieldtype": "Check",
+   "label": "Warranty / After-Sales Support Offered"
+  },
+  {
+   "depends_on": "eval:doc.business_type=='Technology / Software Vendor'",
+   "fieldname": "support_sla",
+   "fieldtype": "Data",
+   "label": "Support / SLA Terms",
+   "mandatory_depends_on": "eval:doc.business_type=='Technology / Software Vendor'"
+  },
+  {
+   "fieldname": "section_break_profile",
+   "fieldtype": "Section Break",
+   "label": "Profile & Catalogue"
+  },
+  {
+   "description": "Maximum file size: 10 MB.",
+   "fieldname": "profile_attachment",
+   "fieldtype": "Attach",
+   "label": "Business / Capability Profile"
+  },
+  {
+   "fieldname": "column_break_profile",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Maximum file size: 10 MB.",
+   "fieldname": "catalogue_attachment",
+   "fieldtype": "Attach",
+   "label": "Products / Services Catalogue"
+  },
+  {
+   "fieldname": "column_break_profile_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Maximum file size: 10 MB.",
+   "fieldname": "additional_attachment",
+   "fieldtype": "Attach",
+   "label": "Additional Attachment"
+  }
+ ],
+ "custom_css": ".web-form-header .web-form-title h1 {\n\tfont-size: var(--text-2xl);\n}\n\n.web-form-introduction {\n\tfont-size: var(--text-sm);\n\tcolor: var(--text-muted);\n}\n\n.web-form .web-form-wrapper .form-section {\n\tpadding: 0.5rem 0 0.75rem;\n\tmargin-bottom: 0.5rem;\n\tborder-bottom: 1px solid var(--dark-border-color);\n}\n\n.web-form .web-form-wrapper .form-section:last-of-type {\n\tborder-bottom: none;\n}\n\n.web-form .web-form-wrapper .form-section .section-head {\n\tfont-size: var(--text-md);\n\tfont-weight: 600;\n\tpadding: 0.25rem 0;\n\tmargin-bottom: 0.25rem;\n}\n\n.web-form .web-form-wrapper .form-column .form-group {\n\tmargin-bottom: 0.5rem;\n}"
+}
