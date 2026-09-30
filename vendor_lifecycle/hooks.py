@@ -1,8 +1,8 @@
 app_name = "vendor_lifecycle"
-app_title = "Vendor Lifecycle"
-app_publisher = "Auriga IT"
+app_title = "ERPNext Vendor Lifecycle Management"
+app_publisher = "Rahul Chaudhary"
 app_description = "Vendor onboarding and deboarding lifecycle management for Frappe/ERPNext"
-app_email = "rahul.chaudhary@aurigait.com"
+app_email = "rc1248117@gmail.com"
 app_license = "mit"
 
 # Apps
@@ -266,6 +266,10 @@ scheduler_events = {
 		"vendor_lifecycle.vendor_lifecycle.tasks.send_checklist_assignment_reminders",
 		"vendor_lifecycle.vendor_lifecycle.tasks.send_deboarding_checklist_followups",
 		"vendor_lifecycle.vendor_lifecycle.tasks.send_signoff_followups",
+		"vendor_lifecycle.vendor_lifecycle.tasks.send_compliance_audit_renewal_notices",
+		"vendor_lifecycle.vendor_lifecycle.tasks.send_compliance_audit_renewal_draft_reminders",
+		"vendor_lifecycle.vendor_lifecycle.tasks.send_signoff_renewal_notices",
+		"vendor_lifecycle.vendor_lifecycle.tasks.send_signoff_renewal_draft_reminders",
 	],
 	# Needs a specific time (2 AM), unlike the "daily" bucket above which
 	# just runs sometime during Frappe's own daily scheduler window.

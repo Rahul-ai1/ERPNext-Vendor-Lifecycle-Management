@@ -1,4 +1,4 @@
-// Copyright (c) 2026, Auriga IT and contributors
+// Copyright (c) 2026, Rahul Chaudhary and contributors
 // For license information, please see license.txt
 
 frappe.ui.form.on("Supplier", {
@@ -17,6 +17,7 @@ frappe.ui.form.on("Supplier", {
 			"Vendor Support Ticket",
 			"Vendor Deboarding Request",
 			"Vendor Deboarding Checklist",
+			"Vendor Reboarding Request",
 		].forEach((doctype) => {
 			frm.can_make_methods[doctype] = () => false;
 		});

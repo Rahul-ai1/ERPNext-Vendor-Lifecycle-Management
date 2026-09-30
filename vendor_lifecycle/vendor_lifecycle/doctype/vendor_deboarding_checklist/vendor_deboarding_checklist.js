@@ -1,4 +1,4 @@
-// Copyright (c) 2026, Auriga IT and contributors
+// Copyright (c) 2026, Rahul Chaudhary and contributors
 // For license information, please see license.txt
 
 const CHECKLIST_CONFIRM_STATUSES = ["Invalid", "Unable to Complete"];
@@ -163,30 +163,64 @@ frappe.ui.form.on("Vendor Deboarding Checklist", {
 		});
 
 		// Only offered once submitted — the server checks the same role
-		// again inside temporarily_enable_supplier() itself, in case of a
-		// stale page or a direct API call.
+		// again inside toggle_temporary_enable() itself, in case of a
+		// stale page or a direct API call. A real toggle, same mechanism
+		// as Vendor Deboarding Request's own Freeze/Unfreeze Supplier
+		// button: once enabled, this same button flips to "Disable
+		// Supplier" — clicking it disables the vendor right away instead
+		// of waiting out the rest of the 7-day window, and stops the
+		// nightly auto-disable job from doing anything further here (it
+		// only ever acts on a Checklist still flagged as temporarily
+		// enabled).
 		if (frm.doc.docstatus === 1) {
 			frm.call("get_temporary_enable_button_info").then((r) => {
 				const info = r.message || {};
 				if (!info.show) return;
 
-				const label = info.is_temporarily_enabled
-					? __("Temporarily Enabled (until {0})", [frappe.datetime.str_to_user(info.expires_on)])
-					: __("Temporarily Enable Supplier");
-				frm.add_custom_button(label, () => {
-					frappe.confirm(
-						__(
-							"Temporarily enable this Supplier for 7 days? It will be automatically disabled again"
-								+ " afterward unless this is repeated."
-						),
-						() => frm.call("temporarily_enable_supplier").then(() => frm.reload_doc())
-					);
-				});
+				if (info.is_temporarily_enabled) {
+					frm.add_custom_button(__("Disable Supplier"), () => {
+						frappe.confirm(
+							__(
+								"Temporarily enabled until {0}. Disable the Supplier now instead of waiting?",
+								[frappe.datetime.str_to_user(info.expires_on)]
+							),
+							() => frm.call("toggle_temporary_enable").then(() => frm.reload_doc())
+						);
+					}).addClass("btn-danger");
+				} else {
+					frm.add_custom_button(__("Temporarily Enable Supplier"), () => {
+						frappe.confirm(
+							__(
+								"Temporarily enable this Supplier for 7 days? It will be automatically disabled again"
+									+ " afterward unless you disable it sooner, or repeat this."
+							),
+							() => frm.call("toggle_temporary_enable").then(() => frm.reload_doc())
+						);
+					});
+				}
 			});
 		}
 	},
 
 	before_submit(frm) {
+		// Mark Deboarding as Failed bypasses the normal completion/
+		// clearance checks server-side (before_submit) too — this is its
+		// own dedicated "you sure?" in place of the ordinary flagged-item
+		// confirm below, since ticking it already implies items may be
+		// incomplete.
+		if (frm.doc.mark_as_failed) {
+			return new Promise((resolve, reject) => {
+				frappe.confirm(
+					__(
+						"This will submit the Checklist as a FAILED deboarding. The Supplier will NOT be disabled,"
+							+ " and the Vendor Lifecycle Stage will be set to Deboarding Failed. Continue?"
+					),
+					resolve,
+					reject
+				);
+			});
+		}
+
 		// Not Started / In Progress rows already hard-block submit
 		// server-side (before_submit) — this is purely a "you sure?" for
 		// the statuses that ARE allowed to submit but mean something

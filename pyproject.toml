@@ -1,7 +1,7 @@
 [project]
 name = "vendor_lifecycle"
 authors = [
-    { name = "Auriga IT", email = "rahul.chaudhary@aurigait.com"}
+    { name = "Rahul Chaudhary", email = "rc1248117@gmail.com"}
 ]
 description = "Vendor onboarding and deboarding lifecycle management for Frappe/ERPNext"
 requires-python = ">=3.14"

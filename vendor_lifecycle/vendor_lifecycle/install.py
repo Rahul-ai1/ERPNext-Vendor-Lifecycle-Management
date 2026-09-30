@@ -1,4 +1,4 @@
-# Copyright (c) 2026, Auriga IT and contributors
+# Copyright (c) 2026, Rahul Chaudhary and contributors
 # For license information, please see license.txt
 
 import glob
@@ -25,11 +25,21 @@ def sync_standard_files():
 		if os.path.exists(path):
 			import_file_by_path(path, force=True)
 
-	# Web Forms are "is_standard" (JSON-file-owned, like a DocType or Page),
-	# but migrate's automatic module sync doesn't cover them the way it does
-	# DocType/Page/Report/Workspace — an edit to a Web Form's JSON otherwise
-	# just sits on disk forever without ever reaching the database. Force-
-	# import every one this app ships, every migrate, same as above.
+
+def sync_web_forms():
+	"""One-time only — see patches/seed_web_forms_once.py. Web Forms are
+	"is_standard" (JSON-file-owned, like a DocType or Page), but migrate's
+	automatic module sync doesn't cover them the way it does DocType/Page/
+	Report/Workspace — an edit to a Web Form's JSON otherwise just sits on
+	disk forever without ever reaching the database, so some explicit
+	import really is needed. This used to run every single migrate though
+	(same mechanism, and same bug, as the Desktop Icon/Workspace Sidebar
+	fix) — any later customization made to this app's Web Form(s) through
+	the Desk's own visual editor got silently reverted back to whatever
+	the committed file says, the very next migrate. Now only ever runs
+	once — a site's own later customization actually sticks. A brand-new
+	site still gets every Web Form this app ships installed on its first
+	migrate (patches run there too)."""
 	web_form_dir = frappe.get_app_path("vendor_lifecycle", "vendor_lifecycle", "web_form")
 	for path in glob.glob(os.path.join(web_form_dir, "*", "*.json")):
 		import_file_by_path(path, force=True)
@@ -137,69 +147,29 @@ def after_install():
 	after_migrate()
 
 
-# Any string that only appears in the current _signoff_email_shell() output —
-# used to tell an already-restyled template apart from one still carrying the
-# older, plainer shell.
-EMAIL_TEMPLATE_STYLE_MARKER = "box-shadow:0 2px 10px"
-
-
-def resync_default_email_template_styling():
-	# The backfill_default_*_email_template*() calls below are all
-	# "create if missing" — once a template exists in the DB, editing its
-	# HTML here has no effect on migrate. Delete any default template still
-	# carrying the old, unstyled shell so the very next backfill call in
-	# after_migrate() recreates it fresh with the current styling. Once a
-	# template's response carries the marker, this is a no-op for it forever.
-	names = [
-		DEFAULT_SIGNOFF_EMAIL_TEMPLATE,
-		DEFAULT_SIGNOFF_RECEIVED_EMAIL_TEMPLATE,
-		DEFAULT_SIGNOFF_PASSED_EMAIL_TEMPLATE,
-		DEFAULT_SIGNOFF_FAILED_EMAIL_TEMPLATE,
-		DEFAULT_VENDOR_LIFECYCLE_PASSED_EMAIL_TEMPLATE,
-		DEFAULT_VENDOR_LIFECYCLE_FAILED_EMAIL_TEMPLATE,
-		DEFAULT_ONBOARDING_RECEIVED_EMAIL_TEMPLATE,
-		DEFAULT_ONBOARDING_NEW_REQUEST_EMAIL_TEMPLATE,
-		DEFAULT_SATISFACTION_SURVEY_CREATED_EMAIL_TEMPLATE,
-		DEFAULT_SATISFACTION_SURVEY_REMINDER_EMAIL_TEMPLATE,
-		DEFAULT_SUPPORT_TICKET_CREATED_EMAIL_TEMPLATE,
-		DEFAULT_SUPPORT_TICKET_NEW_TICKET_ALERT_EMAIL_TEMPLATE,
-		DEFAULT_SUPPORT_TICKET_RESOLVED_EMAIL_TEMPLATE,
-		DEFAULT_SUPPORT_TICKET_REOPENED_EMAIL_TEMPLATE,
-		DEFAULT_SUPPORT_TICKET_ESCALATION_EMAIL_TEMPLATE,
-		DEFAULT_DEBOARDING_REQUEST_CREATED_EMAIL_TEMPLATE,
-		DEFAULT_DEBOARDING_REQUEST_REJECTED_EMAIL_TEMPLATE,
-		DEFAULT_DEBOARDING_REQUEST_APPROVED_EMAIL_TEMPLATE,
-		DEFAULT_CHECKLIST_TASK_ASSIGNED_EMAIL_TEMPLATE,
-		DEFAULT_CHECKLIST_TASK_REMINDER_EMAIL_TEMPLATE,
-		DEFAULT_CLEARANCE_CERTIFICATE_EMAIL_TEMPLATE,
-		DEFAULT_CLEARANCE_CERTIFICATE_RECEIVED_EMAIL_TEMPLATE,
-		DEFAULT_CLEARANCE_CERTIFICATE_FOLLOWUP_EMAIL_TEMPLATE,
-		DEFAULT_SIGNOFF_FOLLOWUP_EMAIL_TEMPLATE,
-		DEFAULT_MANUAL_ATTACH_NEEDED_EMAIL_TEMPLATE,
-	]
-	for name in names:
-		response = frappe.db.get_value("Email Template", name, "response")
-		if response and EMAIL_TEMPLATE_STYLE_MARKER not in response:
-			frappe.db.delete("Email Template", {"name": name})
+# There used to be a resync_default_email_template_styling() here, run on
+# every migrate, that deleted any default Email Template still missing a
+# style marker so the (then-every-migrate) backfill_default_*_email_
+# template*() calls right after it would recreate it freshly restyled.
+# Once those became a one-time patch (see patches/seed_email_templates_
+# once.py), that delete-then-recreate handoff broke — a template still
+# missing the marker would be deleted with nothing left to bring it back.
+# Removed rather than reworked: forcing a re-style by deleting the
+# existing record is the same "overwrite a deliberate customization"
+# problem this whole round of fixes was about — a site that had edited
+# its own copy of a template would have had it silently replaced too.
 
 
 def after_migrate():
 	sync_standard_files()
-	resync_default_email_template_styling()
-	migrate_reference_check_mandatory_setting()
-	backfill_kyc_billing_currency()
-	backfill_team_size_buckets()
 	backfill_settings_defaults()
-	backfill_default_satisfaction_rating_template()
-	backfill_last_satisfaction_survey_date()
 	rename_ndc_terminology()
+	rename_stage_in_process_terminology()
 	migrate_onboarding_request_to_submittable()
 	remove_stale_setting("request_edit_override_role")
 	migrate_kyc_firm_address_to_address_line_1()
 	normalize_kyc_state_casing()
 	migrate_kyc_status_draft_to_in_progress()
-	backfill_kyc_status_from_docstatus()
-	install_vendor_kyc_workflow()
 	migrate_supplier_hold_to_is_frozen()
 	remove_stale_client_script("Vendor Background Check Load Rating Template Button")
 	migrate_compliance_checks_to_child_table()
@@ -207,29 +177,9 @@ def after_migrate():
 		remove_stale_client_script(name)
 	backfill_missing_compliance_check_template()
 	backfill_result_method_resolved()
-	_ensure_default_checklist_template()
 	rename_estimated_monthly_capacity()
 	migrate_facility_applicable_to_yes_no()
-	backfill_license_insurance_masters()
-	backfill_default_compliance_check_sources()
-	backfill_default_coverage_types()
-	backfill_default_licenses_and_permits_masters()
-	remove_stale_generic_insurers()
-	backfill_default_insurance_masters()
-	# Must run after backfill_default_satisfaction_rating_template() above
-	# — it reuses the same Rating Criteria rows that function creates,
-	# even though it also re-ensures them defensively itself.
-	backfill_default_rating_criteria_template()
-	backfill_default_sampling_evaluation_template()
-	seed_indian_states()
 	migrate_signoff_email_settings_to_vendor_lifecycle()
-	backfill_default_signoff_email_template()
-	backfill_default_signoff_received_email_template()
-	backfill_default_signoff_passed_email_template()
-	backfill_default_signoff_failed_email_template()
-	backfill_default_vendor_lifecycle_stage_email_templates()
-	backfill_default_satisfaction_survey_email_templates()
-	backfill_default_support_ticket_email_templates()
 	remove_stale_setting("esign_provider")
 	remove_stale_setting("supplier_unfreeze_role")
 	remove_stale_setting("signoff_email_account")
@@ -241,28 +191,13 @@ def after_migrate():
 	remove_stale_web_form("vendor-signoff-upload")
 	remove_stale_setting("enforce_sequential_stages")
 	remove_stale_setting("sampling_mandatory")
-	# Both of these must run before backfill_sampling_mandatory_business_
-	# types() - it does a full settings.save(), which used to validate every
-	# mandatory field on this Settings singleton, including the two these
-	# backfill. ignore_mandatory=True on that save() is a second safety net
-	# now, but keeping the real dependency order here is still the correct
-	# fix, not just a workaround.
-	backfill_default_deboarding_rating_template()
-	backfill_default_deboarding_checklist_template()
-	backfill_sampling_mandatory_business_types()
 	migrate_background_check_result_method_off_average()
 	remove_stale_setting("minimum_average_rating")
 	remove_stale_web_form("vendor-satisfaction-survey")
 	remove_stale_setting("disable_timing")
-	backfill_default_deboarding_request_email_templates()
-	migrate_is_resolvable_check_to_select()
-	backfill_default_checklist_task_email_templates()
-	backfill_default_clearance_certificate_email_templates()
-	backfill_default_signoff_followup_email_template()
 	remove_stale_setting("deboarding_notification_provider")
-	backfill_default_manual_attach_needed_email_template()
 	remove_stale_number_card("Vendors Through App")
-	install_getting_started_sample()
+	backfill_ticket_resolved_on()
 
 
 # Business Types considered "service nature", plus "Other" (too ambiguous to
@@ -412,11 +347,52 @@ def remove_stale_module_directory(subfolder, name):
 # matching page, and keep doing so on every visit until dismissed. That
 # also means these two don't auto-chain into each other (Frappe only
 # supports that via the ui_tour=1 auto-trigger path) - each is independent.
-def install_getting_started_sample():
-	_install_sample_form_tours()
-	_install_sample_module_onboarding()
+VENDOR_LIFECYCLE_FORM_TOURS = [
+	"Vendor KYC Tour",
+	"Vendor Onboarding Request Tour",
+	"Vendor Deboarding Request Tour",
+	"Vendor Deboarding Checklist Tour",
+	"Vendor Satisfaction Survey Tour",
+]
 
 
+def backfill_form_tour_step_positions():
+	# Every step in these tours was originally created with position="Left"
+	# - fine for a field with room to its left, but for a field sitting
+	# close to the left edge of the content area (e.g. Business Type, the
+	# first field in its own section) the tooltip renders mostly off the
+	# left edge of the screen, clipped and unreadable (confirmed via a
+	# real screenshot). "Bottom" is Frappe's own default position for
+	# exactly this reason (see Form Tour Step's own "position" field
+	# default) and has no equivalent edge-clipping risk.
+	# _install_sample_form_tours() below only ever creates these once
+	# (a frappe.db.exists check) - a site that already has them installed
+	# needs this explicit one-time fix instead of a fresh create. Runs
+	# every migrate, but only ever touches a step still set to "Left".
+	for tour_name in VENDOR_LIFECYCLE_FORM_TOURS:
+		if not frappe.db.exists("Form Tour", tour_name):
+			continue
+		frappe.db.sql(
+			"update `tabForm Tour Step` set position = 'Bottom' where parent = %s and position = 'Left'",
+			(tour_name,),
+		)
+
+
+# install_getting_started_sample()/_install_sample_module_onboarding() used
+# to live here — they manually inserted the sample Onboarding Step/Module
+# Onboarding records "if not already there." Removed: both doctypes have
+# real committed JSON files (module_onboarding/, onboarding_step/), which
+# Frappe's own core file-sync already recreates on every migrate regardless
+# of anything in this app's own code — confirmed directly in Frappe's own
+# frappe/model/sync.py, which lists both doctypes among the ones it syncs
+# the same way it does a DocType or Report. This function was pure
+# redundant work riding alongside that.
+#
+# _install_sample_form_tours()/backfill_form_tour_step_positions() below
+# are NOT part of that same file-backed sync — Form Tour has no committed
+# JSON file backing it, so they used to re-check and recreate themselves on
+# every migrate the same way the master data did. Moved to their own
+# one-time patch instead (see patches/seed_form_tours_once.py).
 def _install_sample_form_tours():
 	# Deliberately NOT ui_tour=1 - that route-auto-triggers a tour the
 	# instant a user lands on a matching page (and keeps re-triggering on
@@ -447,7 +423,7 @@ def _install_sample_form_tours():
 					"fieldtype": "Check",
 					"label": "Verified by External Agency",
 					"description": "Either pick internal verifiers below, or tick this to hand verification to an outside agency instead.",
-					"position": "Left",
+					"position": "Bottom",
 				},
 				{
 					"title": "Firm Name",
@@ -455,7 +431,7 @@ def _install_sample_form_tours():
 					"fieldtype": "Data",
 					"label": "Firm Name",
 					"description": "Carried over from the Onboarding Request - double-check it's correct. Mandatory.",
-					"position": "Left",
+					"position": "Bottom",
 				},
 				{
 					"title": "Legal Entity Type",
@@ -463,7 +439,7 @@ def _install_sample_form_tours():
 					"fieldtype": "Select",
 					"label": "Legal Entity Type",
 					"description": "How this vendor is legally structured - Sole Proprietorship, Private Limited, Partnership, and so on. Mandatory.",
-					"position": "Left",
+					"position": "Bottom",
 				},
 				{
 					"title": "Billing Currency",
@@ -471,7 +447,7 @@ def _install_sample_form_tours():
 					"fieldtype": "Link",
 					"label": "Billing Currency",
 					"description": "The Supplier Setup section - which currency this vendor is billed and paid in.",
-					"position": "Left",
+					"position": "Bottom",
 				},
 				{
 					"title": "Contact Person Name",
@@ -479,7 +455,7 @@ def _install_sample_form_tours():
 					"fieldtype": "Data",
 					"label": "Contact Person Name",
 					"description": "The Contact tab - who to reach at this vendor for day-to-day communication. Mandatory.",
-					"position": "Left",
+					"position": "Bottom",
 				},
 				{
 					"title": "Contact Person Number",
@@ -487,7 +463,7 @@ def _install_sample_form_tours():
 					"fieldtype": "Phone",
 					"label": "Contact Person Number",
 					"description": "A direct phone number for the Contact Person above. Mandatory.",
-					"position": "Left",
+					"position": "Bottom",
 				},
 				{
 					"title": "Official Email",
@@ -495,7 +471,7 @@ def _install_sample_form_tours():
 					"fieldtype": "Data",
 					"label": "Official Email",
 					"description": "Where every KYC-related email to this vendor goes. Mandatory.",
-					"position": "Left",
+					"position": "Bottom",
 				},
 				{
 					"title": "Address Line 1",
@@ -503,7 +479,7 @@ def _install_sample_form_tours():
 					"fieldtype": "Data",
 					"label": "Address Line 1",
 					"description": "The Address tab - the first line of this vendor's full postal address, used for the GSTIN checks further on for India-based vendors. Mandatory.",
-					"position": "Left",
+					"position": "Bottom",
 				},
 				{
 					"title": "City",
@@ -511,7 +487,7 @@ def _install_sample_form_tours():
 					"fieldtype": "Data",
 					"label": "City",
 					"description": "The city this vendor's registered address is in. Mandatory.",
-					"position": "Left",
+					"position": "Bottom",
 				},
 				{
 					"title": "Country",
@@ -519,7 +495,7 @@ def _install_sample_form_tours():
 					"fieldtype": "Link",
 					"label": "Country",
 					"description": "Mandatory - also decides whether the India-specific PAN/GSTIN fields on the Tax & Compliance tab show up.",
-					"position": "Left",
+					"position": "Bottom",
 				},
 				{
 					"title": "Postal / ZIP Code",
@@ -527,7 +503,7 @@ def _install_sample_form_tours():
 					"fieldtype": "Data",
 					"label": "Postal / ZIP Code",
 					"description": "The postal or ZIP code for the address above. Mandatory.",
-					"position": "Left",
+					"position": "Bottom",
 				},
 				{
 					"title": "Business Type",
@@ -535,7 +511,7 @@ def _install_sample_form_tours():
 					"fieldtype": "Select",
 					"label": "Business Type",
 					"description": "The Business Details tab - once you pick a Business Type, extra fields specific to that type of vendor appear below it. Mandatory.",
-					"position": "Left",
+					"position": "Bottom",
 				},
 				{
 					"title": "Tax & Compliance",
@@ -543,7 +519,7 @@ def _install_sample_form_tours():
 					"fieldtype": "Data",
 					"label": "Tax ID (PAN / VAT / EIN, etc.)",
 					"description": "PAN, GSTIN, business registration, and compliance certificates all live on this tab.",
-					"position": "Left",
+					"position": "Bottom",
 				},
 				{
 					"title": "Bank Details",
@@ -551,7 +527,7 @@ def _install_sample_form_tours():
 					"fieldtype": "Data",
 					"label": "Bank Account Name",
 					"description": "Needed before any payment can be made to this vendor.",
-					"position": "Left",
+					"position": "Bottom",
 				},
 			],
 		}).insert(ignore_permissions=True)
@@ -581,7 +557,7 @@ def _install_sample_form_tours():
 					"fieldtype": "Data",
 					"label": "Company / Firm Name",
 					"description": "The vendor's registered company or firm name.",
-					"position": "Left",
+					"position": "Bottom",
 				},
 				{
 					"title": "Business Type",
@@ -589,7 +565,7 @@ def _install_sample_form_tours():
 					"fieldtype": "Select",
 					"label": "Business Type",
 					"description": "What the vendor does - once you pick one, an \"About Your Business\" section appears further down with extra fields specific to that type of vendor.",
-					"position": "Left",
+					"position": "Bottom",
 				},
 				{
 					"title": "Contact & Address",
@@ -597,7 +573,7 @@ def _install_sample_form_tours():
 					"fieldtype": "Data",
 					"label": "Contact Person",
 					"description": "This section covers the vendor's basic reachability - Contact Person, Phone, Email, and full Address.",
-					"position": "Left",
+					"position": "Bottom",
 				},
 				{
 					"title": "Profile & Catalogue",
@@ -605,7 +581,7 @@ def _install_sample_form_tours():
 					"fieldtype": "Attach",
 					"label": "Business / Capability Profile",
 					"description": "Optional supporting documents - a company profile, product catalogue, or anything else worth attaching.",
-					"position": "Left",
+					"position": "Bottom",
 				},
 			],
 		}).insert(ignore_permissions=True)
@@ -628,7 +604,7 @@ def _install_sample_form_tours():
 					"fieldtype": "Link",
 					"label": "Vendor",
 					"description": "Who's being deboarded. Mandatory.",
-					"position": "Left",
+					"position": "Bottom",
 				},
 				{
 					"title": "Reason",
@@ -636,7 +612,7 @@ def _install_sample_form_tours():
 					"fieldtype": "Small Text",
 					"label": "Reason",
 					"description": "Why this vendor is being deboarded. Mandatory.",
-					"position": "Left",
+					"position": "Bottom",
 				},
 				{
 					"title": "Is the Issue Resolvable?",
@@ -644,7 +620,7 @@ def _install_sample_form_tours():
 					"fieldtype": "Select",
 					"label": "Is the Issue with the Vendor Resolvable?",
 					"description": "A judgment call on whether this could still be fixed rather than ending the relationship. Mandatory.",
-					"position": "Left",
+					"position": "Bottom",
 				},
 				{
 					"title": "Ratings",
@@ -652,7 +628,7 @@ def _install_sample_form_tours():
 					"fieldtype": "Table",
 					"label": "Ratings",
 					"description": "Score every row here before this request can be saved - a final performance record for this vendor.",
-					"position": "Left",
+					"position": "Bottom",
 				},
 			],
 		}).insert(ignore_permissions=True)
@@ -670,7 +646,7 @@ def _install_sample_form_tours():
 					"fieldtype": "Link",
 					"label": "Checklist Template",
 					"description": "Which template this Checklist's tasks were loaded from. Mandatory.",
-					"position": "Left",
+					"position": "Bottom",
 				},
 				{
 					"title": "Company",
@@ -678,7 +654,7 @@ def _install_sample_form_tours():
 					"fieldtype": "Link",
 					"label": "Company",
 					"description": "Which Company this Checklist belongs to - used to resolve the GSTIN shown on the clearance certificate email.",
-					"position": "Left",
+					"position": "Bottom",
 				},
 				{
 					"title": "Additional Email",
@@ -686,7 +662,7 @@ def _install_sample_form_tours():
 					"fieldtype": "Data",
 					"label": "Additional Supplier Email",
 					"description": "An extra recipient for the clearance certificate email, alongside the vendor's own KYC/Supplier contacts.",
-					"position": "Left",
+					"position": "Bottom",
 				},
 				{
 					"title": "Checklist Items",
@@ -694,7 +670,7 @@ def _install_sample_form_tours():
 					"fieldtype": "Table",
 					"label": "Checklist Items",
 					"description": "Every task needs a status (Completed/Invalid/Unable to Complete) and at least one assignee before this Checklist can be submitted.",
-					"position": "Left",
+					"position": "Bottom",
 				},
 				{
 					"title": "Clearance",
@@ -702,7 +678,7 @@ def _install_sample_form_tours():
 					"fieldtype": "Check",
 					"label": "No Clearance Certificate Available",
 					"description": "Attach the signed clearance certificate below, or tick this and give a reason if one genuinely isn't available.",
-					"position": "Left",
+					"position": "Bottom",
 				},
 			],
 		}).insert(ignore_permissions=True)
@@ -720,7 +696,7 @@ def _install_sample_form_tours():
 					"fieldtype": "Link",
 					"label": "Vendor",
 					"description": "Which vendor this survey is scoring. Mandatory.",
-					"position": "Left",
+					"position": "Bottom",
 				},
 				{
 					"title": "Period",
@@ -728,7 +704,7 @@ def _install_sample_form_tours():
 					"fieldtype": "Select",
 					"label": "Period",
 					"description": "Which period this survey covers. Mandatory.",
-					"position": "Left",
+					"position": "Bottom",
 				},
 				{
 					"title": "Survey Date",
@@ -736,7 +712,7 @@ def _install_sample_form_tours():
 					"fieldtype": "Date",
 					"label": "Survey Date",
 					"description": "When this survey was conducted. Mandatory.",
-					"position": "Left",
+					"position": "Bottom",
 				},
 				{
 					"title": "Ratings",
@@ -744,7 +720,7 @@ def _install_sample_form_tours():
 					"fieldtype": "Table",
 					"label": "Ratings",
 					"description": "Score every criteria row here - the actual satisfaction scoring for this vendor.",
-					"position": "Left",
+					"position": "Bottom",
 				},
 				{
 					"title": "Feedback",
@@ -752,114 +728,10 @@ def _install_sample_form_tours():
 					"fieldtype": "Small Text",
 					"label": "Areas of Concern",
 					"description": "The Feedback section - Areas of Concern and Suggestions for Improvement, both optional free text.",
-					"position": "Left",
+					"position": "Bottom",
 				},
 			],
 		}).insert(ignore_permissions=True)
-
-
-def _install_sample_module_onboarding():
-	if not frappe.db.exists("Onboarding Step", "Vendor Lifecycle Settings Setup"):
-		frappe.get_doc({
-			"doctype": "Onboarding Step",
-			"name": "Vendor Lifecycle Settings Setup",
-			"title": "Set Up Vendor Lifecycle Settings",
-			# Deliberately plain navigation, not a Form Tour - Vendor
-			# Lifecycle Settings is a Single doctype, and Frappe's own tour
-			# engine has a real compatibility gap with Singles (the tour
-			# cancels itself before ever showing anything, traced to an
-			# extra internal navigation step Singles trigger on load that
-			# a regular doctype's form doesn't). Not something worth
-			# fighting for a light sample - just get the user there.
-			"action": "Update Settings",
-			"reference_document": "Vendor Lifecycle Settings",
-			"validate_action": 0,
-			"action_label": "Review Settings",
-			"description": "Review the default templates, mandatory checks, and email account before anything else.",
-		}).insert(ignore_permissions=True)
-
-	if not frappe.db.exists("Onboarding Step", "Vendor Onboarding Request Tour Step"):
-		frappe.get_doc({
-			"doctype": "Onboarding Step",
-			"name": "Vendor Onboarding Request Tour Step",
-			"title": "Take the Onboarding Tour",
-			# The floating "Getting Started" panel (OnboardingPanel.vue)
-			# shows action_label as each step's own button text - unlike
-			# the older block-widget renderer (onboarding_widget.js), it has
-			# no fallback to title/action if this is left blank, so it just
-			# renders empty.
-			"action_label": "Onboarding Request",
-			"action": "Show Form Tour",
-			"reference_document": "Vendor Onboarding Request",
-			"form_tour": "Vendor Onboarding Request Tour",
-			"description": "A quick walkthrough of the first form in the onboarding pipeline.",
-		}).insert(ignore_permissions=True)
-
-	if not frappe.db.exists("Onboarding Step", "Vendor KYC Tour Step"):
-		frappe.get_doc({
-			"doctype": "Onboarding Step",
-			"name": "Vendor KYC Tour Step",
-			"title": "Take the KYC Tour",
-			"action_label": "Vendor KYC",
-			"action": "Show Form Tour",
-			"reference_document": "Vendor KYC",
-			"form_tour": "Vendor KYC Tour",
-			"description": "A quick walkthrough of the KYC form - verification, firm details, address, business type, tax, and bank details.",
-		}).insert(ignore_permissions=True)
-
-	if not frappe.db.exists("Onboarding Step", "Vendor Deboarding Request Tour Step"):
-		frappe.get_doc({
-			"doctype": "Onboarding Step",
-			"name": "Vendor Deboarding Request Tour Step",
-			"title": "Take the Deboarding Request Tour",
-			"action_label": "Deboarding Request",
-			"action": "Show Form Tour",
-			"reference_document": "Vendor Deboarding Request",
-			"form_tour": "Vendor Deboarding Request Tour",
-			"description": "A quick walkthrough of the Deboarding Request form.",
-		}).insert(ignore_permissions=True)
-
-	if not frappe.db.exists("Onboarding Step", "Vendor Deboarding Checklist Tour Step"):
-		frappe.get_doc({
-			"doctype": "Onboarding Step",
-			"name": "Vendor Deboarding Checklist Tour Step",
-			"title": "Take the Deboarding Checklist Tour",
-			"action_label": "Deboarding Checklist",
-			"action": "Show Form Tour",
-			"reference_document": "Vendor Deboarding Checklist",
-			"form_tour": "Vendor Deboarding Checklist Tour",
-			"description": "A quick walkthrough of the Deboarding Checklist form.",
-		}).insert(ignore_permissions=True)
-
-	if not frappe.db.exists("Onboarding Step", "Vendor Satisfaction Survey Tour Step"):
-		frappe.get_doc({
-			"doctype": "Onboarding Step",
-			"name": "Vendor Satisfaction Survey Tour Step",
-			"title": "Take the Satisfaction Survey Tour",
-			"action_label": "Satisfaction Survey",
-			"action": "Show Form Tour",
-			"reference_document": "Vendor Satisfaction Survey",
-			"form_tour": "Vendor Satisfaction Survey Tour",
-			"description": "A quick walkthrough of the Satisfaction Survey form.",
-		}).insert(ignore_permissions=True)
-
-	if frappe.db.exists("Module Onboarding", "Vendor Lifecycle Onboarding"):
-		return
-	frappe.get_doc({
-		"doctype": "Module Onboarding",
-		"name": "Vendor Lifecycle Onboarding",
-		"title": "Vendor Lifecycle Setup",
-		"module": "Vendor Lifecycle",
-		"allow_roles": [{"role": "Vendor Lifecycle Manager"}],
-		"steps": [
-			{"step": "Vendor Onboarding Request Tour Step"},
-			{"step": "Vendor KYC Tour Step"},
-			{"step": "Vendor Deboarding Request Tour Step"},
-			{"step": "Vendor Deboarding Checklist Tour Step"},
-			{"step": "Vendor Satisfaction Survey Tour Step"},
-			{"step": "Vendor Lifecycle Settings Setup"},
-		],
-	}).insert(ignore_permissions=True)
 
 
 # All Client Script logic in this app was moved into real, committed .js
@@ -890,23 +762,17 @@ REMOVED_CLIENT_SCRIPTS = [
 ]
 
 
-def migrate_reference_check_mandatory_setting():
-	# "Vendor Reference Check" was renamed to "Vendor Background Check" and
-	# merged with what used to be Compliance Audit's background-check
-	# fields — carry over whatever an admin had already set for the old
-	# "reference_check_mandatory" toggle before its column gets dropped,
-	# rather than silently resetting to the new field's own default.
-	# "Vendor Lifecycle Settings" is a Single — its field values live in the
-	# shared `tabSingles` table, not a dedicated table, so column existence
-	# has to be checked there rather than with has_column().
-	if frappe.db.exists(
-		"Singles", {"doctype": "Vendor Lifecycle Settings", "field": "reference_check_mandatory"}
-	) and not frappe.db.exists(
-		"Singles", {"doctype": "Vendor Lifecycle Settings", "field": "background_check_mandatory"}
-	):
-		old_value = frappe.db.get_single_value("Vendor Lifecycle Settings", "reference_check_mandatory")
-		if old_value is not None:
-			frappe.db.set_single_value("Vendor Lifecycle Settings", "background_check_mandatory", old_value)
+# There used to be a migrate_reference_check_mandatory_setting() here, a
+# one-time carry-over for an old "reference_check_mandatory" Settings
+# checkbox from back when this app had a separate "Vendor Reference Check"
+# doctype (long since renamed/merged into Vendor Background Check).
+# Removed: its own existence check used the same broken frappe.db.exists(
+# "Singles", {...}) pattern found and fixed elsewhere in this file, so it
+# had never actually run on any site. Confirmed safe to just delete rather
+# than fix - the old field has zero rows in the database, the doctype it
+# was about doesn't exist anymore, and the new field (background_check_
+# mandatory) already gets a correct value through the unrelated, already-
+# fixed backfill_settings_defaults() instead.
 
 
 # "NDC" (No Dues Certificate) was renamed to the region-neutral "Clearance
@@ -931,6 +797,26 @@ def rename_ndc_terminology():
 	current = frappe.db.get_single_value("Vendor Lifecycle Settings", "disable_timing")
 	if current in NDC_TO_CLEARANCE:
 		frappe.db.set_single_value("Vendor Lifecycle Settings", "disable_timing", NDC_TO_CLEARANCE[current])
+
+
+# The three "actively in progress" Vendor Lifecycle Stage values were
+# renamed to read as a status rather than a document type name — the
+# terminal/failed values (Onboarded, Onboarding Failed, Deboarded, ...)
+# never meant "still ongoing" and were left alone.
+STAGE_IN_PROCESS_RENAME = {
+	"Onboarding": "Onboarding in Process",
+	"Deboarding": "Deboarding in Process",
+	"Reboarding": "Reboarding in Process",
+}
+
+
+def rename_stage_in_process_terminology():
+	if not frappe.db.has_column("Supplier", "vendor_lifecycle_stage"):
+		return
+	for old, new in STAGE_IN_PROCESS_RENAME.items():
+		frappe.db.sql(
+			"update `tabSupplier` set vendor_lifecycle_stage = %s where vendor_lifecycle_stage = %s", (new, old)
+		)
 
 
 def migrate_onboarding_request_to_submittable():
@@ -1030,32 +916,6 @@ def migrate_kyc_status_draft_to_in_progress():
 	""")
 
 
-def backfill_kyc_status_from_docstatus():
-	# migrate_kyc_status_draft_to_in_progress() above only ever caught
-	# records still carrying the old "Draft" label — the actual root
-	# cause (on_submit()/on_cancel() setting self.status via a bare
-	# assignment, which happens after Frappe has already written the
-	# document to the database for that request and so never actually
-	# persists) was never fixed at the code level until now, so any KYC
-	# submitted or cancelled *after* that migration ran kept getting
-	# stuck showing whatever the current default ("In Progress") already
-	# was — indistinguishable from "never changed" — rather than "Draft".
-	# Catches every remaining straggler directly from docstatus instead
-	# of matching a specific stale label. "Verified" was later renamed to
-	# "Approved", and "Cancelled" became its own real status instead of a
-	# bounce back to "In Progress" once the Vendor KYC Workflow was added
-	# — this backfill's targets follow both renames so it still writes a
-	# currently-valid option if it ever needs to run again.
-	frappe.db.sql("""
-		update `tabVendor KYC` set status = 'Approved'
-		where docstatus = 1 and status != 'Approved'
-	""")
-	frappe.db.sql("""
-		update `tabVendor KYC` set status = 'Cancelled'
-		where docstatus = 2 and status != 'Cancelled'
-	""")
-
-
 # Vendor KYC's own status field (see vendor_kyc.json) drives, and is driven
 # by, this Workflow. A Vendor Lifecycle User does the actual KYC work and
 # submits it for review ("Send for Approval": In Progress -> Approval
@@ -1077,6 +937,11 @@ VENDOR_KYC_WORKFLOW_STATES = {
 	"Approved": ("1", "Vendor Lifecycle Manager", None),  # reused as-is - already styled Success
 	"Rejected": ("0", "Vendor Lifecycle Manager", None),  # reused as-is - already styled Danger
 	"Cancelled": ("2", "Vendor Lifecycle Manager", None),  # reused as-is
+	# A User can discard an abandoned/mistaken KYC before ever sending it
+	# for approval; only a Manager can then edit it further (enforced by
+	# Frappe's own Workflow permission engine via allow_edit, no extra
+	# code needed) - a terminal state, same as Rejected, not a bounce-back.
+	"Trashed": ("0", "Vendor Lifecycle Manager", "Inverse"),
 }
 # (state, action, next_state, allowed role) - one role per transition, per
 # the actual review split: only a User can send for approval, only a
@@ -1086,11 +951,39 @@ VENDOR_KYC_WORKFLOW_TRANSITIONS = [
 	("Approval Pending", "Approve", "Approved", "Vendor Lifecycle Manager"),
 	("Approval Pending", "Reject", "Rejected", "Vendor Lifecycle Manager"),
 	("Approved", "Cancel", "Cancelled", "Vendor Lifecycle Manager"),
+	("In Progress", "Trash", "Trashed", "Vendor Lifecycle User"),
+]
+
+# Same shape as Vendor KYC's own workflow above, for Vendor Reboarding
+# Request - deliberately its own separate spec, not a shared constant,
+# consistent with keeping Re-boarding's own settings/logic independent of
+# the onboarding pipeline's (see the Re-boarding feature's own design
+# notes) - only the generic installer plumbing below is actually shared.
+VENDOR_REBOARDING_REQUEST_WORKFLOW_STATES = {
+	"In Progress": ("0", "Vendor Lifecycle User", "Warning"),
+	"Approval Pending": ("0", "Vendor Lifecycle Manager", "Info"),
+	"Approved": ("1", "Vendor Lifecycle Manager", None),
+	"Rejected": ("0", "Vendor Lifecycle Manager", None),
+	"Cancelled": ("2", "Vendor Lifecycle Manager", None),
+	"Trashed": ("0", "Vendor Lifecycle Manager", "Inverse"),
+}
+VENDOR_REBOARDING_REQUEST_WORKFLOW_TRANSITIONS = [
+	("In Progress", "Send for Approval", "Approval Pending", "Vendor Lifecycle User"),
+	("Approval Pending", "Approve", "Approved", "Vendor Lifecycle Manager"),
+	("Approval Pending", "Reject", "Rejected", "Vendor Lifecycle Manager"),
+	("Approved", "Cancel", "Cancelled", "Vendor Lifecycle Manager"),
+	("In Progress", "Trash", "Trashed", "Vendor Lifecycle User"),
 ]
 
 
-def install_vendor_kyc_workflow():
-	for state, (_doc_status, _allow_edit, style) in VENDOR_KYC_WORKFLOW_STATES.items():
+def _install_workflow(document_type, states, transitions):
+	"""Shared installer for any (states, transitions) spec shaped like
+	VENDOR_KYC_WORKFLOW_STATES/_TRANSITIONS above - generic plumbing
+	(create missing Workflow State/Workflow Action Master fixtures,
+	diff-and-resync the Workflow document itself), not a business rule,
+	so sharing it doesn't conflict with keeping each doctype's own
+	mandatory-check settings/logic independent."""
+	for state, (_doc_status, _allow_edit, style) in states.items():
 		if frappe.db.exists("Workflow State", state):
 			continue
 		frappe.get_doc({
@@ -1101,13 +994,13 @@ def install_vendor_kyc_workflow():
 
 	# A fresh site only ships 3 default Workflow Action Master records
 	# (Approve/Reject/Review, seeded by frappe/utils/install.py) - any other
-	# action name, like our own "Send for Approval"/"Cancel", normally only
-	# gets created as a side effect of typing it into the Workflow Builder
-	# UI. Since this Workflow is created here in code, never through that
-	# UI, create whichever ones are missing ourselves first - otherwise the
-	# Workflow Transition rows below fail link validation on a truly fresh
-	# install.
-	actions = {action for _state, action, _next_state, _allowed in VENDOR_KYC_WORKFLOW_TRANSITIONS}
+	# action name, like our own "Send for Approval"/"Cancel"/"Trash",
+	# normally only gets created as a side effect of typing it into the
+	# Workflow Builder UI. Since this Workflow is created here in code,
+	# never through that UI, create whichever ones are missing ourselves
+	# first - otherwise the Workflow Transition rows below fail link
+	# validation on a truly fresh install.
+	actions = {action for _state, action, _next_state, _allowed in transitions}
 	for action in actions:
 		if not frappe.db.exists("Workflow Action Master", action):
 			frappe.get_doc({
@@ -1115,12 +1008,12 @@ def install_vendor_kyc_workflow():
 				"workflow_action_name": action,
 			}).insert(ignore_permissions=True)
 
-	if frappe.db.exists("Workflow", "Vendor KYC"):
-		workflow = frappe.get_doc("Workflow", "Vendor KYC")
+	if frappe.db.exists("Workflow", document_type):
+		workflow = frappe.get_doc("Workflow", document_type)
 	else:
 		workflow = frappe.new_doc("Workflow")
-		workflow.workflow_name = "Vendor KYC"
-		workflow.document_type = "Vendor KYC"
+		workflow.workflow_name = document_type
+		workflow.document_type = document_type
 		workflow.is_active = 1
 		workflow.send_email_alert = 0
 
@@ -1136,35 +1029,36 @@ def install_vendor_kyc_workflow():
 	workflow.workflow_state_field = "workflow_state"
 
 	# Rebuilt from the spec above every time rather than diffed - this is
-	# the one workflow the app installs, so there's nothing a site admin
-	# could have customized on it yet to preserve; simplest way to keep it
-	# in sync as the spec itself changes (e.g. adding Approval Pending here).
+	# the one workflow each of these doctypes installs, so there's
+	# nothing a site admin could have customized on it yet to preserve;
+	# simplest way to keep it in sync as the spec itself changes (e.g.
+	# adding a new state here).
 	current_states = [
 		(s.state, s.doc_status, s.allow_edit) for s in workflow.states
 	]
 	desired_states = [
 		(state, doc_status, allow_edit)
-		for state, (doc_status, allow_edit, _style) in VENDOR_KYC_WORKFLOW_STATES.items()
+		for state, (doc_status, allow_edit, _style) in states.items()
 	]
 	current_transitions = [
 		(t.state, t.action, t.next_state, t.allowed) for t in workflow.transitions
 	]
 	if (
 		current_states == desired_states
-		and current_transitions == VENDOR_KYC_WORKFLOW_TRANSITIONS
+		and current_transitions == transitions
 		and not state_field_changed
 	):
 		return
 
 	workflow.set("states", [])
 	workflow.set("transitions", [])
-	for state, (doc_status, allow_edit, _style) in VENDOR_KYC_WORKFLOW_STATES.items():
+	for state, (doc_status, allow_edit, _style) in states.items():
 		workflow.append("states", {
 			"state": state,
 			"doc_status": doc_status,
 			"allow_edit": allow_edit,
 		})
-	for state, action, next_state, allowed in VENDOR_KYC_WORKFLOW_TRANSITIONS:
+	for state, action, next_state, allowed in transitions:
 		workflow.append("transitions", {
 			"state": state,
 			"action": action,
@@ -1178,28 +1072,38 @@ def install_vendor_kyc_workflow():
 		workflow.save(ignore_permissions=True)
 
 
+def install_vendor_kyc_workflow():
+	_install_workflow("Vendor KYC", VENDOR_KYC_WORKFLOW_STATES, VENDOR_KYC_WORKFLOW_TRANSITIONS)
+
+
+def install_vendor_reboarding_request_workflow():
+	_install_workflow(
+		"Vendor Reboarding Request",
+		VENDOR_REBOARDING_REQUEST_WORKFLOW_STATES,
+		VENDOR_REBOARDING_REQUEST_WORKFLOW_TRANSITIONS,
+	)
+
+
+# This function used to also convert on_hold=1 to is_frozen=1 for any
+# vendor_kyc-linked Supplier (the onboarding freeze mechanism's own,
+# one-time transition off the old on_hold/hold_type fields, long since
+# complete on every site). Removed: on_hold is still a live, unrestricted
+# core ERPNext field a staff member can set on any Supplier — including one
+# of ours — for a completely unrelated reason (e.g. a payment dispute).
+# Running that conversion on every migrate meant a real, current, unrelated
+# hold got silently reinterpreted as a vendor-lifecycle freeze the next
+# time anyone migrated.
 def migrate_supplier_hold_to_is_frozen():
 	# Suppliers created before the vendor_kyc backlink field existed never
 	# got it backfilled — without it, the read_only_depends_on Property
 	# Setter on Supplier.is_frozen wouldn't recognize them as vendor-
 	# lifecycle Suppliers at all. Backfill from Vendor KYC's own (older)
-	# `supplier` field first, so the fix below actually reaches them too.
+	# `supplier` field first.
 	frappe.db.sql("""
 		update `tabSupplier` s
 		inner join `tabVendor KYC` k on k.supplier = s.name
 		set s.vendor_kyc = k.name
 		where (s.vendor_kyc is null or s.vendor_kyc = '')
-	""")
-
-	# The onboarding freeze switched from on_hold/hold_type ("Block
-	# Supplier" — narrow, only some transaction types) to is_frozen (core
-	# ERPNext's broader, centrally-enforced party freeze). Only touches
-	# Suppliers this app itself created (vendor_kyc set) that are still on
-	# the old mechanism — a Supplier a real user separately put on hold for
-	# an unrelated reason is left alone.
-	frappe.db.sql("""
-		update `tabSupplier` set is_frozen = 1, on_hold = 0, hold_type = ''
-		where vendor_kyc is not null and vendor_kyc != '' and on_hold = 1
 	""")
 
 
@@ -1252,16 +1156,14 @@ def migrate_compliance_checks_to_child_table():
 	# (Background Check, Sanctions/PEP, Criminal Record, Credit Check,
 	# Debarment Check) were consolidated into one repeatable "Compliance
 	# Checks" table, so a deployment can add its own check types later
-	# without a schema change. This seeds the standard check types every
-	# migrate (cheap, idempotent), then — once — carries over any non-
-	# default data already sitting in the old columns.
+	# without a schema change. Standard check types + the default template
+	# are seeded once by the seed_vendor_lifecycle_master_data patch, not
+	# here — this now only ever carries over any non-default data already
+	# sitting in the old columns, once.
 	#
 	# The old columns themselves are left as harmless orphans rather than
 	# dropped here — same ImplicitCommitError reason as the other
 	# migrations in this file.
-	_ensure_compliance_check_types()
-	_ensure_default_compliance_check_template()
-
 	if not frappe.db.has_column("Vendor Background Check", "background_check_status"):
 		return
 
@@ -1326,77 +1228,22 @@ SETTINGS_FIELD_DEFAULTS = {
 	"satisfaction_survey_reminder_emails": 1,
 	"support_ticket_emails": 1,
 	"support_ticket_escalation_emails": 1,
+	"compliance_audit_renewal_due_emails": 1,
+	"compliance_audit_renewal_draft_reminder_emails": 1,
+	"signoff_renewal_due_emails": 1,
+	"signoff_renewal_draft_reminder_emails": 1,
 }
 
 
-TEAM_SIZE_BUCKETS = ("0-50", "51-100", "101-150", "150+")
-
-
-def _team_size_bucket_for(raw_value):
-	try:
-		count = int(raw_value)
-	except (TypeError, ValueError):
-		return None
-	if count <= 50:
-		return "0-50"
-	if count <= 100:
-		return "51-100"
-	if count <= 150:
-		return "101-150"
-	return "150+"
-
-
-def backfill_team_size_buckets():
-	# team_size on both Vendor Onboarding Request and Vendor KYC was
-	# converted from a plain number field to a Select of 4 fixed size
-	# ranges — any value already stored as a raw number (e.g. 11, 1200)
-	# no longer matches any of those options and would show as an
-	# unrecognized/blank value on an existing record. Maps each one into
-	# its matching bucket, once; a value already one of the 4 valid
-	# bucket strings (from a fresh save after this change) is left alone,
-	# which is also what keeps this safe to run on every migrate.
-	for doctype in ("Vendor Onboarding Request", "Vendor KYC"):
-		rows = frappe.get_all(doctype, fields=["name", "team_size"], filters={"team_size": ["is", "set"]})
-		for row in rows:
-			if row.team_size in TEAM_SIZE_BUCKETS:
-				continue
-			bucket = _team_size_bucket_for(row.team_size)
-			if bucket:
-				frappe.db.set_value(doctype, row.name, "team_size", bucket)
-
-
-def backfill_kyc_billing_currency():
-	# billing_currency became mandatory on Vendor KYC without a backfill for
-	# already-existing records at the time — confirmed on two separate
-	# sites to leave old records permanently stuck (can't be saved again
-	# through any path, including an internal re-save, until someone fills
-	# it in by hand) since Frappe doesn't retroactively validate a newly-
-	# mandatory field against rows that already existed. Fixing that gap
-	# here, following the same "backfill every existing row" rule used
-	# throughout this file (see e.g. backfill_missing_compliance_check_
-	# template) — a record found once should never get stuck again.
-	#
-	# Prefers the linked Supplier's own default_currency (set by staff for
-	# that specific vendor) over the site's own Global Defaults currency,
-	# since that's the more specific, more likely-correct value when it's
-	# actually set.
-	affected = frappe.get_all(
-		"Vendor KYC", filters={"billing_currency": ["in", ["", None]]}, fields=["name", "supplier"]
-	)
-	if not affected:
-		return
-
-	site_default_currency = frappe.db.get_single_value("Global Defaults", "default_currency")
-	for row in affected:
-		currency = None
-		if row.supplier:
-			currency = frappe.db.get_value("Supplier", row.supplier, "default_currency")
-		currency = currency or site_default_currency
-		if not currency:
-			# No currency configured anywhere on the site to fall back to —
-			# nothing safe to backfill with; leave it for a human to set.
-			continue
-		frappe.db.set_value("Vendor KYC", row.name, "billing_currency", currency)
+# backfill_supplier_compliance_audit_valid_until() / backfill_supplier_
+# contract_valid_until() used to live here — one-time mirrors of "when
+# does this vendor's Compliance Audit/contract currently expire" onto the
+# Supplier, for any vendor that already had a Passed record before these
+# Supplier-level fields existed. Removed: every stage doctype that can set
+# either field already pushes it directly on submit going forward (and
+# each backfill only ever filled a currently-blank field), so nothing
+# running today can still leave one of these blank — running this on
+# every migrate was pure repeated work over already-settled data.
 
 
 def backfill_settings_defaults():
@@ -1409,8 +1256,20 @@ def backfill_settings_defaults():
 	# value: a Check field backfilled to "1" is legitimately "0" once an
 	# admin unchecks it, and a falsy-value check would keep flipping it
 	# back to the default on every migrate.
+	#
+	# frappe.db.exists("Singles", {...}) does NOT work for this - Singles
+	# is a special internal storage table, not a normal doctype, and that
+	# call silently returns falsy even when a row genuinely exists.
+	# Confirmed directly against the database: every field in this dict
+	# was being unconditionally reset to its default on every single
+	# migrate, silently undoing anything an admin had deliberately
+	# changed. frappe.db.get_singles_dict() is what Frappe's own core
+	# uses internally to load a Single doctype's real stored values -
+	# checking key presence in that dict is the actual reliable way to
+	# tell "never configured" apart from "deliberately set to 0/blank".
+	existing_fields = frappe.db.get_singles_dict("Vendor Lifecycle Settings")
 	for fieldname, default in SETTINGS_FIELD_DEFAULTS.items():
-		if not frappe.db.exists("Singles", {"doctype": "Vendor Lifecycle Settings", "field": fieldname}):
+		if fieldname not in existing_fields:
 			frappe.db.set_single_value("Vendor Lifecycle Settings", fieldname, default)
 
 
@@ -1451,27 +1310,22 @@ def backfill_default_satisfaction_rating_template():
 		)
 
 
-def backfill_last_satisfaction_survey_date():
-	# Supplier.last_satisfaction_survey_date only starts getting kept in
-	# sync going forward (see VendorSatisfactionSurvey.after_insert) — this
-	# fills in real history for surveys that already existed before that
-	# field did, so a vendor surveyed last week doesn't look never-surveyed
-	# to the scheduler and get an unwanted extra one today. Only fills in
-	# where still blank — never overwrites a value the app itself set.
-	rows = frappe.db.sql(
+def backfill_ticket_resolved_on():
+	# resolved_on is new — an existing ticket already sitting in Resolved
+	# never had it set by mark_resolved() at the time. Its own `modified`
+	# is the best available stand-in (not exact, but close enough for an
+	# aging report — the alternative, leaving it blank, would make the
+	# report keep counting these up to today forever, exactly the bug
+	# this field exists to fix).
+	if not frappe.db.has_column("Vendor Support Ticket", "resolved_on"):
+		return
+	frappe.db.sql(
 		"""
-		select vendor, max(survey_date) as last_date
-		from `tabVendor Satisfaction Survey`
-		where vendor is not null and vendor != ''
-		group by vendor
-		""",
-		as_dict=True,
+		update `tabVendor Support Ticket`
+		set resolved_on = modified
+		where status = 'Resolved' and resolved_on is null
+		"""
 	)
-	for row in rows:
-		if not frappe.db.exists("Supplier", row.vendor):
-			continue
-		if not frappe.db.get_value("Supplier", row.vendor, "last_satisfaction_survey_date"):
-			frappe.db.set_value("Supplier", row.vendor, "last_satisfaction_survey_date", row.last_date)
 
 
 def backfill_missing_compliance_check_template():
@@ -1607,29 +1461,6 @@ def migrate_facility_applicable_to_yes_no():
 		"update `tabVendor Compliance Audit` set facility_applicable = 'No'"
 		" where facility_applicable in ('0', '') or facility_applicable is null"
 	)
-
-
-def backfill_license_insurance_masters():
-	# license_type/issuing_authority/insurance_type/insurer were converted
-	# from free-text Data fields to Link fields pointing at new master
-	# doctypes — any value already typed into an existing row needs a
-	# matching master record created for it, or that row's Link would show
-	# as invalid/unresolvable going forward. Idempotent: only ever creates
-	# what's missing.
-	_backfill_master_from_columns("License Type", "license_type_name", [
-		("Vendor Compliance Audit License", "license_type"),
-		("Licenses and Permits Template Item", "license_type"),
-	])
-	_backfill_master_from_columns("Issuing Authority", "issuing_authority_name", [
-		("Vendor Compliance Audit License", "issuing_authority"),
-	])
-	_backfill_master_from_columns("Insurance Type", "insurance_type_name", [
-		("Vendor Compliance Audit Insurance", "insurance_type"),
-		("Insurance Template Item", "insurance_type"),
-	])
-	_backfill_master_from_columns("Insurer", "insurer_name", [
-		("Vendor Compliance Audit Insurance", "insurer"),
-	])
 
 
 DEFAULT_COMPLIANCE_CHECK_SOURCES = [
@@ -1885,23 +1716,6 @@ def seed_indian_states():
 			frappe.get_doc({"doctype": "State", "state_name": state_name, "country": "India"}).insert(
 				ignore_permissions=True
 			)
-
-
-def _backfill_master_from_columns(master_doctype, master_fieldname, source_columns):
-	values = set()
-	for source_doctype, fieldname in source_columns:
-		if not frappe.db.has_column(source_doctype, fieldname):
-			continue
-		values.update(
-			frappe.db.sql_list(
-				f"select distinct `{fieldname}` from `tab{source_doctype}`"
-				f" where `{fieldname}` is not null and `{fieldname}` != ''"
-			)
-		)
-
-	for value in values:
-		if not frappe.db.exists(master_doctype, value):
-			frappe.get_doc({"doctype": master_doctype, master_fieldname: value}).insert(ignore_permissions=True)
 
 
 def _ensure_default_checklist_template():
@@ -2422,23 +2236,111 @@ def backfill_default_deboarding_request_email_templates():
 		}).insert(ignore_permissions=True)
 
 
-def migrate_is_resolvable_check_to_select():
-	# is_resolvable was a plain Check (0/1); it's now a mandatory Select
-	# (Yes/No/Maybe) so a value has to be a deliberate choice, not a silent
-	# default. The old boolean column just becomes varchar in place, so
-	# existing rows are left holding the literal strings "0"/"1" — neither
-	# is a valid option. "1" maps to "Yes"; "0" is cleared to blank rather
-	# than mapped to "No", since it was never a deliberate answer (it was
-	# every row's untouched default).
-	rows = frappe.db.sql(
-		"select name, is_resolvable from `tabVendor Deboarding Request` where is_resolvable in ('0', '1')",
-		as_dict=True,
-	)
-	for row in rows:
-		frappe.db.set_value(
-			"Vendor Deboarding Request", row.name, "is_resolvable", "Yes" if row.is_resolvable == "1" else ""
-		)
+DEFAULT_REBOARDING_REQUEST_RECEIVED_EMAIL_TEMPLATE = "Vendor Reboarding Request Received"
+DEFAULT_REBOARDING_REQUEST_APPROVED_EMAIL_TEMPLATE = "Vendor Reboarding Request Approved"
+DEFAULT_REBOARDING_REQUEST_REJECTED_EMAIL_TEMPLATE = "Vendor Reboarding Request Rejected"
+DEFAULT_REBOARDING_REQUEST_APPROVED_CREATOR_EMAIL_TEMPLATE = "Vendor Reboarding Request Approved - Creator Copy"
+DEFAULT_REBOARDING_REQUEST_REJECTED_CREATOR_EMAIL_TEMPLATE = "Vendor Reboarding Request Rejected - Creator Copy"
 
+
+def backfill_default_reboarding_request_email_templates():
+	# All three are vendor-facing (the supplier being reconsidered), unlike
+	# Deboarding Request's own Created/Rejected (internal-only) - there's
+	# no internal "request raised" email here since this is always staff-
+	# initiated in the first place; the vendor only needs to hear about it
+	# once it's actually under review.
+	if not frappe.db.exists("Email Template", DEFAULT_REBOARDING_REQUEST_RECEIVED_EMAIL_TEMPLATE):
+		body = (
+			"<p>Dear {{ contact_person_name or 'Sir/Madam' }},</p>"
+			"<p>We have received a request to re-board your account with {{ company_name }}"
+			" (<b>{{ request_name }}</b>), and it is now under review.</p>"
+			+ _info_box(SIGNOFF_REQUEST_ACCENT, "Requested On: {{ request_date }}")
+			+ "<p>We'll be in touch once a decision has been made.</p>"
+			"<p>Thank you,<br>{{ company_name }}</p>"
+		)
+		frappe.get_doc({
+			"doctype": "Email Template",
+			"name": DEFAULT_REBOARDING_REQUEST_RECEIVED_EMAIL_TEMPLATE,
+			"subject": "Your Re-boarding Request Has Been Received",
+			"response": _signoff_email_shell(SIGNOFF_REQUEST_ACCENT, "Received", "Re-boarding Request Received", body),
+		}).insert(ignore_permissions=True)
+
+	if not frappe.db.exists("Email Template", DEFAULT_REBOARDING_REQUEST_APPROVED_EMAIL_TEMPLATE):
+		body = (
+			"<p>Dear {{ contact_person_name or 'Sir/Madam' }},</p>"
+			"<p>We're pleased to let you know that your re-boarding request with {{ company_name }}"
+			" (<b>{{ request_name }}</b>) has been approved.</p>"
+			"<p>We'll be in touch shortly about next steps.</p>"
+			"<p>Thank you,<br>{{ company_name }}</p>"
+		)
+		frappe.get_doc({
+			"doctype": "Email Template",
+			"name": DEFAULT_REBOARDING_REQUEST_APPROVED_EMAIL_TEMPLATE,
+			"subject": "Your Re-boarding Request Has Been Approved",
+			"response": _signoff_email_shell(SIGNOFF_PASSED_ACCENT, "Approved", "Re-boarding Request Approved", body),
+		}).insert(ignore_permissions=True)
+
+	if not frappe.db.exists("Email Template", DEFAULT_REBOARDING_REQUEST_REJECTED_EMAIL_TEMPLATE):
+		body = (
+			"<p>Dear {{ contact_person_name or 'Sir/Madam' }},</p>"
+			"<p>After review, your re-boarding request with {{ company_name }} (<b>{{ request_name }}</b>) has"
+			" not been approved at this time.</p>"
+			"<p>Thank you,<br>{{ company_name }}</p>"
+		)
+		frappe.get_doc({
+			"doctype": "Email Template",
+			"name": DEFAULT_REBOARDING_REQUEST_REJECTED_EMAIL_TEMPLATE,
+			"subject": "Your Re-boarding Request Has Been Rejected",
+			"response": _signoff_email_shell(SIGNOFF_FAILED_ACCENT, "Rejected", "Re-boarding Request Rejected", body),
+		}).insert(ignore_permissions=True)
+
+
+def backfill_default_reboarding_request_creator_email_templates():
+	# Internal-only, unlike the three vendor-facing ones above — goes to
+	# whoever raised the Request (self.owner), not the vendor, same
+	# reasoning as Vendor Deboarding Request's own Rejected email
+	# (_notify_rejected_unsafe there): the creator has no other way to
+	# find out a decision was made unless they keep checking the document
+	# by hand. A separate, later patch (not folded into the original
+	# backfill_default_reboarding_request_email_templates above) since
+	# that one already ran on every existing site by the time these two
+	# were added — see this app's own patches.txt convention.
+	if not frappe.db.exists("Email Template", DEFAULT_REBOARDING_REQUEST_APPROVED_CREATOR_EMAIL_TEMPLATE):
+		body = (
+			"<p>Hi,</p>"
+			"<p>The Vendor Reboarding Request you raised, <b>{{ request_name }}</b>"
+			"{% if vendor_name %} for {{ vendor_name }}{% endif %}, has been <b>Approved</b>.</p>"
+			"<p>You can now create Background Check, Compliance Audit, Sampling Evaluation, and Sign-off"
+			" documents against it.</p>"
+			"<p>Thank you,<br>{{ company_name }}</p>"
+		)
+		frappe.get_doc({
+			"doctype": "Email Template",
+			"name": DEFAULT_REBOARDING_REQUEST_APPROVED_CREATOR_EMAIL_TEMPLATE,
+			"subject": "Vendor Reboarding Request {{ request_name }} Approved",
+			"response": _signoff_email_shell(SIGNOFF_PASSED_ACCENT, "Approved", "Re-boarding Request Approved", body),
+		}).insert(ignore_permissions=True)
+
+	if not frappe.db.exists("Email Template", DEFAULT_REBOARDING_REQUEST_REJECTED_CREATOR_EMAIL_TEMPLATE):
+		body = (
+			"<p>Hi,</p>"
+			"<p>The Vendor Reboarding Request you raised, <b>{{ request_name }}</b>"
+			"{% if vendor_name %} for {{ vendor_name }}{% endif %}, has been <b>Rejected</b>.</p>"
+			"<p>Thank you,<br>{{ company_name }}</p>"
+		)
+		frappe.get_doc({
+			"doctype": "Email Template",
+			"name": DEFAULT_REBOARDING_REQUEST_REJECTED_CREATOR_EMAIL_TEMPLATE,
+			"subject": "Vendor Reboarding Request {{ request_name }} Rejected",
+			"response": _signoff_email_shell(SIGNOFF_FAILED_ACCENT, "Rejected", "Re-boarding Request Rejected", body),
+		}).insert(ignore_permissions=True)
+
+
+# migrate_is_resolvable_check_to_select() used to live here — a one-time
+# conversion of is_resolvable from a plain Check (0/1) to today's mandatory
+# Select (Yes/No/Maybe), for any row still holding the old literal "0"/"1"
+# strings. Removed: the field has been a Select for a while now, and
+# nothing currently writing to it can produce those old values again.
 
 DEFAULT_DEBOARDING_CHECKLIST_TEMPLATE = "Default Deboarding Checklist"
 DEFAULT_DEBOARDING_CHECKLIST_ITEMS = [
@@ -2624,5 +2526,98 @@ def backfill_default_manual_attach_needed_email_template():
 			"subject": "Manual Attachment Needed — {{ doctype_label }} {{ document_name }}",
 			"response": _signoff_email_shell(
 				VENDOR_LIFECYCLE_INTERNAL_ACCENT, "Action Needed", "Manual Attachment Needed", body
+			),
+		}).insert(ignore_permissions=True)
+
+
+DEFAULT_COMPLIANCE_AUDIT_RENEWAL_DUE_EMAIL_TEMPLATE = "Compliance Audit Renewal Due"
+DEFAULT_COMPLIANCE_AUDIT_RENEWAL_DRAFT_REMINDER_EMAIL_TEMPLATE = "Compliance Audit Renewal Draft Reminder"
+
+
+def backfill_default_compliance_audit_renewal_email_templates():
+	# Both internal-only (sent to the Vendor Lifecycle Manager, and the
+	# draft's own creator where relevant) - see tasks.
+	# send_compliance_audit_renewal_notices / _draft_reminders.
+	if not frappe.db.exists("Email Template", DEFAULT_COMPLIANCE_AUDIT_RENEWAL_DUE_EMAIL_TEMPLATE):
+		body = (
+			"<p>Hello,</p>"
+			"<p><b>{{ vendor_name }}</b> ({{ vendor }})'s Compliance Audit is valid until"
+			" <b>{{ valid_until }}</b> - {{ days_remaining }} day(s) from now.</p>"
+			+ _info_box(
+				VENDOR_LIFECYCLE_INTERNAL_ACCENT,
+				"Start (or check on) a Renewal Compliance Audit for this vendor before it lapses.",
+			)
+			+ "<p>Thank you,<br>{{ company_name }}</p>"
+		)
+		frappe.get_doc({
+			"doctype": "Email Template",
+			"name": DEFAULT_COMPLIANCE_AUDIT_RENEWAL_DUE_EMAIL_TEMPLATE,
+			"subject": "Compliance Audit Renewal Due Soon - {{ vendor_name }}",
+			"response": _signoff_email_shell(
+				VENDOR_LIFECYCLE_INTERNAL_ACCENT, "Reminder", "Compliance Audit Renewal Due Soon", body
+			),
+		}).insert(ignore_permissions=True)
+
+	if not frappe.db.exists("Email Template", DEFAULT_COMPLIANCE_AUDIT_RENEWAL_DRAFT_REMINDER_EMAIL_TEMPLATE):
+		body = (
+			"<p>Hello,</p>"
+			"<p>The Renewal Compliance Audit <b>{{ draft_name }}</b> for <b>{{ vendor_name }}</b> ({{ vendor }})"
+			" has been sitting as a draft for {{ days_open }} day(s).</p>"
+			+ '<p><a href="{{ draft_link }}">Open it</a> and complete it.</p>'
+			+ "<p>Thank you,<br>{{ company_name }}</p>"
+		)
+		frappe.get_doc({
+			"doctype": "Email Template",
+			"name": DEFAULT_COMPLIANCE_AUDIT_RENEWAL_DRAFT_REMINDER_EMAIL_TEMPLATE,
+			"subject": "Renewal Compliance Audit Still Pending - {{ vendor_name }}",
+			"response": _signoff_email_shell(
+				VENDOR_LIFECYCLE_INTERNAL_ACCENT, "Reminder", "Renewal Compliance Audit Still Pending", body
+			),
+		}).insert(ignore_permissions=True)
+
+
+DEFAULT_SIGNOFF_RENEWAL_DUE_EMAIL_TEMPLATE = "Sign Off Renewal Due"
+DEFAULT_SIGNOFF_RENEWAL_DRAFT_REMINDER_EMAIL_TEMPLATE = "Sign Off Renewal Draft Reminder"
+
+
+def backfill_default_signoff_renewal_email_templates():
+	# Both internal-only (sent to the Vendor Lifecycle Manager, and the
+	# draft's own creator where relevant) - see tasks.
+	# send_signoff_renewal_notices / _draft_reminders. Same shape as
+	# backfill_default_compliance_audit_renewal_email_templates.
+	if not frappe.db.exists("Email Template", DEFAULT_SIGNOFF_RENEWAL_DUE_EMAIL_TEMPLATE):
+		body = (
+			"<p>Hello,</p>"
+			"<p><b>{{ vendor_name }}</b> ({{ vendor }})'s contract is valid until"
+			" <b>{{ valid_until }}</b> - {{ days_remaining }} day(s) from now.</p>"
+			+ _info_box(
+				VENDOR_LIFECYCLE_INTERNAL_ACCENT,
+				"Start (or check on) a Renewal Sign Off for this vendor before it lapses.",
+			)
+			+ "<p>Thank you,<br>{{ company_name }}</p>"
+		)
+		frappe.get_doc({
+			"doctype": "Email Template",
+			"name": DEFAULT_SIGNOFF_RENEWAL_DUE_EMAIL_TEMPLATE,
+			"subject": "Contract Renewal Due Soon - {{ vendor_name }}",
+			"response": _signoff_email_shell(
+				VENDOR_LIFECYCLE_INTERNAL_ACCENT, "Reminder", "Contract Renewal Due Soon", body
+			),
+		}).insert(ignore_permissions=True)
+
+	if not frappe.db.exists("Email Template", DEFAULT_SIGNOFF_RENEWAL_DRAFT_REMINDER_EMAIL_TEMPLATE):
+		body = (
+			"<p>Hello,</p>"
+			"<p>The Renewal Sign Off <b>{{ draft_name }}</b> for <b>{{ vendor_name }}</b> ({{ vendor }}) has been"
+			" sitting as a draft for {{ days_open }} day(s).</p>"
+			+ '<p><a href="{{ draft_link }}">Open it</a> and complete it.</p>'
+			+ "<p>Thank you,<br>{{ company_name }}</p>"
+		)
+		frappe.get_doc({
+			"doctype": "Email Template",
+			"name": DEFAULT_SIGNOFF_RENEWAL_DRAFT_REMINDER_EMAIL_TEMPLATE,
+			"subject": "Renewal Sign Off Still Pending - {{ vendor_name }}",
+			"response": _signoff_email_shell(
+				VENDOR_LIFECYCLE_INTERNAL_ACCENT, "Reminder", "Renewal Sign Off Still Pending", body
 			),
 		}).insert(ignore_permissions=True)
