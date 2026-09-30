@@ -1,5 +1,5 @@
 // Copyright (c) 2026, Rahul Chaudhary and contributors
-// For license information, please see license.txt
+// For license information, please see LICENSE
 
 frappe.listview_settings["Vendor Support Ticket"] = {
 	// get_indicator() isn't just for the list view — frappe.get_indicator()

@@ -1,5 +1,5 @@
 // Copyright (c) 2026, Rahul Chaudhary and contributors
-// For license information, please see license.txt
+// For license information, please see LICENSE
 
 frappe.pages["vendor-onboarding-public-form"].on_page_load = function (wrapper) {
 	// Workspace Card links only support DocType/Page/Report (no arbitrary

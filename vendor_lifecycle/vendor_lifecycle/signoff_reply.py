@@ -1,5 +1,5 @@
 # Copyright (c) 2026, Rahul Chaudhary and contributors
-# For license information, please see license.txt
+# For license information, please see LICENSE
 
 """Resolves an inbound vendor reply to a Vendor Sign-off email back to the
 right Attach field (Signed Contract / Signed Code of Conduct).
